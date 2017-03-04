@@ -197,6 +197,24 @@ class Enigma2Client():
         response = requests.get("http://%s/web/remotecontrol?command=402" %(HOSTNAME))
         self.update_label(self.get_current_service())
 
+class FeedbackWatcher(threading.Thread):
+    
+    ended = False
+    enigma2_indicator = None
+    enigma_client = None
+    current_service = None
+
+    def __init__(self, enigma2_indicator, enigma_client):
+        threading.Thread.__init__(self)
+        self.enigma2_indicator = enigma2_indicator
+        self.enigma_client = enigma_client
+
+    def run(self):
+        while not self.ended:
+            time.sleep(2.0)
+            self.current_service = self.enigma_client.get_current_service()
+            self.enigma_client.update_label(self.current_service)
+
 class Enigma2Indicator():
 
     indicator = None
@@ -217,6 +235,9 @@ class Enigma2Indicator():
         self.indicator.connect("scroll-event", self.scroll)
 
         self.enigma_client.update_label(current_service)
+
+        self.feedback_watcher = FeedbackWatcher(self, self.enigma_client)
+        self.feedback_watcher.start()
 
         notify.init(APPINDICATOR_ID)
         self.notification = notify.Notification.new("")

@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+__author__ = "andreasschaeffer"
 
 import socket
 import time
@@ -47,9 +50,11 @@ class Enigma2Client():
         self.bouquets["tv"] = []
         self.bouquets["radio"] = []
         self.enigma2_indicator = enigma2_indicator
+
+    def update_bouquets(self):
         self.get_bouquets_tv()
         self.get_bouquets_radio()
-
+        
     def get_model(self):
         response = requests.get("http://%s/web/about" %(HOSTNAME))
         tree = ElementTree.fromstring(response.content)
@@ -90,7 +95,6 @@ class Enigma2Client():
                         service["name"] = service_attr.text
                 if type == "tv":
                     self.bouquets["tv"].append(service)
-        print str(self.bouquets["tv"])
 
     def get_bouquets_radio(self):
         # http://daskaengurutv/web/getservices?sRef=1:7:2:0:0:0:0:0:0:0:type == 2 FROM BOUQUET "bouquets.radio"
@@ -109,7 +113,6 @@ class Enigma2Client():
                         service["name"] = service_attr.text
                 if type == "radio":
                     self.bouquets["radio"].append(service)
-        print str(self.bouquets["radio"])
 
     def get_services(self, bouquet):
         self.services = []
@@ -215,6 +218,20 @@ class FeedbackWatcher(threading.Thread):
             self.current_service = self.enigma_client.get_current_service()
             self.enigma_client.update_label(self.current_service)
 
+class GtkUpdater(threading.Thread):
+    
+    ended = False
+
+    def __init__(self):
+        threading.Thread.__init__(self)
+    
+    def run(self):
+        while not self.ended:
+            gtk.main_iteration_do(False)
+
+    def kill(self):
+        self.ended = True
+
 class Enigma2Indicator():
 
     indicator = None
@@ -227,23 +244,34 @@ class Enigma2Indicator():
 
         self.indicator = appindicator.Indicator.new(APPINDICATOR_ID, self.get_icon_path(self.get_icon()), appindicator.IndicatorCategory.SYSTEM_SERVICES)
         self.indicator.set_status(appindicator.IndicatorStatus.ACTIVE)
-
-        self.enigma_client = Enigma2Client(self)
-        current_service = self.enigma_client.get_current_service()
-
-        self.indicator.set_menu(self.build_menu())
+        menu = gtk.Menu()
+        item_quit = gtk.MenuItem("Quit")
+        item_quit.connect("activate", self.quit)
+        menu.append(item_quit)
+        menu.show_all()
+        self.indicator.set_menu(menu)
         self.indicator.connect("scroll-event", self.scroll)
 
-        self.enigma_client.update_label(current_service)
-
-        self.feedback_watcher = FeedbackWatcher(self, self.enigma_client)
-        self.feedback_watcher.start()
+        gtk_updater = GtkUpdater()
+        gtk_updater.start()
 
         notify.init(APPINDICATOR_ID)
         self.notification = notify.Notification.new("")
         self.notifications_initialized = True
 
         signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+        self.enigma_client = Enigma2Client(self)
+
+        self.update_label("Loading...")
+        self.enigma_client.update_bouquets()
+        self.indicator.set_menu(self.build_menu())
+        
+        current_service = self.enigma_client.get_current_service()
+        self.enigma_client.update_label(current_service)
+
+        self.feedback_watcher = FeedbackWatcher(self, self.enigma_client)
+        self.feedback_watcher.start()
 
         self.set_initialized(True)
 

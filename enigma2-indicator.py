@@ -114,7 +114,7 @@ class Enigma2Client():
         return None
 
     def select_channel(self, widget, service):
-        response = requests.get("http://%s/web/zap?sRef=%s" %(HOSTNAME, service["reference"]))
+        response = requests.get("http://%s/web/zap?sRef=%s" %(HOSTNAME, urllib.quote(service["reference"])))
         self.current_service = service
         self.update_label(service)
 

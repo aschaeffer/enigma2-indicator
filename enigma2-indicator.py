@@ -34,9 +34,6 @@ ICON_PATH = "/usr/share/icons/Humanity/devices/24"
 
 HOSTNAME = "daskaengurutv"
 
-BOUQUET_TV = "userbouquet.andreas_sender__tv_.tv"
-BOUQUET_RADIO = "userbouquet.dbe00.radio"
-
 class Enigma2Client():
 
     model = ""
@@ -44,9 +41,14 @@ class Enigma2Client():
     current_service = None
     services = []
     enigma2_indicator = None
+    bouquets = {}
 
     def __init__(self, enigma2_indicator):
+        self.bouquets["tv"] = []
+        self.bouquets["radio"] = []
         self.enigma2_indicator = enigma2_indicator
+        self.get_bouquets_tv()
+        self.get_bouquets_radio()
 
     def get_model(self):
         response = requests.get("http://%s/web/about" %(HOSTNAME))
@@ -70,6 +72,45 @@ class Enigma2Client():
                 self.current_service = service
         return self.current_service
 
+    def get_bouquets_tv(self):
+        response = requests.get("http://%s/web/getservices" %(HOSTNAME))
+        tree = ElementTree.fromstring(response.content)
+        for service_tag in tree:
+            if service_tag.tag == "e2service":
+                service = {}
+                type = None
+                for service_attr in service_tag:
+                    if service_attr.tag == "e2servicereference":
+                        service["reference"] = service_attr.text
+                        if ".radio" in service["reference"]:
+                            type = "radio"
+                        if ".tv" in service["reference"]:
+                            type = "tv"
+                    if service_attr.tag == "e2servicename":
+                        service["name"] = service_attr.text
+                if type == "tv":
+                    self.bouquets["tv"].append(service)
+        print str(self.bouquets["tv"])
+
+    def get_bouquets_radio(self):
+        # http://daskaengurutv/web/getservices?sRef=1:7:2:0:0:0:0:0:0:0:type == 2 FROM BOUQUET "bouquets.radio"
+        response = requests.get("http://%s/web/getservices?sRef=1:7:2:0:0:0:0:0:0:0:type == 2 FROM BOUQUET \"bouquets.radio\"" %(HOSTNAME))
+        tree = ElementTree.fromstring(response.content)
+        for service_tag in tree:
+            if service_tag.tag == "e2service":
+                service = {}
+                type = None
+                for service_attr in service_tag:
+                    if service_attr.tag == "e2servicereference":
+                        service["reference"] = service_attr.text
+                        if ".radio" in service["reference"]:
+                            type = "radio"
+                    if service_attr.tag == "e2servicename":
+                        service["name"] = service_attr.text
+                if type == "radio":
+                    self.bouquets["radio"].append(service)
+        print str(self.bouquets["radio"])
+
     def get_services(self, bouquet):
         self.services = []
         response = requests.get("http://%s/web/getservices?sRef=1:7:1:0:0:0:0:0:0:0:FROM%%20BOUQUET%%20%%22%s%%22%%20ORDER%%20BY%%20bouquet" %(HOSTNAME, bouquet))
@@ -83,7 +124,25 @@ class Enigma2Client():
                     if service_attr.tag == "e2servicename":
                         service["name"] = service_attr.text
                 self.services.append(service)
-                print service
+        return self.services
+
+    def get_services_2(self, service):
+        self.services = []
+        # print str(service)
+        # print urllib.quote(service["reference"])
+        # print "http://%s/web/getservices?sRef=%s" %(HOSTNAME, urllib.quote(service["reference"]))
+        response = requests.get("http://%s/web/getservices?sRef=%s" %(HOSTNAME, urllib.quote(service["reference"])))
+        tree = ElementTree.fromstring(response.content)
+        for service_tag in tree:
+            if service_tag.tag == "e2service":
+                service = {}
+                for service_attr in service_tag:
+                    if service_attr.tag == "e2servicereference":
+                        service["reference"] = service_attr.text
+                    if service_attr.tag == "e2servicename":
+                        service["name"] = service_attr.text
+                self.services.append(service)
+                # print service
         return self.services
 
     def get_epg(self, service):
@@ -148,14 +207,15 @@ class Enigma2Indicator():
 
     def __init__(self):
 
-        self.enigma_client = Enigma2Client(self)
-        
         self.indicator = appindicator.Indicator.new(APPINDICATOR_ID, self.get_icon_path(self.get_icon()), appindicator.IndicatorCategory.SYSTEM_SERVICES)
         self.indicator.set_status(appindicator.IndicatorStatus.ACTIVE)
+
+        self.enigma_client = Enigma2Client(self)
+        current_service = self.enigma_client.get_current_service()
+
         self.indicator.set_menu(self.build_menu())
         self.indicator.connect("scroll-event", self.scroll)
 
-        current_service = self.enigma_client.get_current_service()
         self.enigma_client.update_label(current_service)
 
         notify.init(APPINDICATOR_ID)
@@ -210,25 +270,34 @@ class Enigma2Indicator():
         menu_tv = gtk.Menu()
         item_tv = gtk.MenuItem("TV")
         item_tv.set_submenu(menu_tv)
-
-        for service in self.enigma_client.get_services(BOUQUET_TV):
-            item_service = gtk.MenuItem(service["name"])
-            item_service.connect("activate", self.enigma_client.select_channel, service)
-            menu_tv.append(item_service)
+        for service in self.enigma_client.bouquets["tv"]:
+            menu_bouquet = gtk.Menu()
+            item_bouquet = gtk.MenuItem(service["name"])
+            item_bouquet.set_submenu(menu_bouquet)
+            menu_tv.append(item_bouquet)
+            for sub_service in self.enigma_client.get_services_2(service):
+                item_service = gtk.MenuItem(sub_service["name"])
+                item_service.connect("activate", self.enigma_client.select_channel, sub_service)
+                menu_bouquet.append(item_service)
         menu.append(item_tv)
 
         menu_radio = gtk.Menu()
         item_radio = gtk.MenuItem("Radio")
         item_radio.set_submenu(menu_radio)
-        for service in self.enigma_client.get_services(BOUQUET_RADIO):
-            item_service = gtk.MenuItem(service["name"])
-            item_service.connect("activate", self.enigma_client.select_channel, service)
-            menu_radio.append(item_service)
+        for service in self.enigma_client.bouquets["radio"]:
+            menu_bouquet = gtk.Menu()
+            item_bouquet = gtk.MenuItem(service["name"])
+            item_bouquet.set_submenu(menu_bouquet)
+            menu_radio.append(item_bouquet)
+            for sub_service in self.enigma_client.get_services_2(service):
+                item_service = gtk.MenuItem(sub_service["name"])
+                item_service.connect("activate", self.enigma_client.select_channel, sub_service)
+                menu_bouquet.append(item_service)
         menu.append(item_radio)
 
         menu.append(gtk.SeparatorMenuItem())
 
-        item_stream = gtk.MenuItem("Stream")
+        item_stream = gtk.MenuItem("Stream Current Station")
         item_stream.connect("activate", self.stream)
         menu.append(item_stream)
         self.indicator.set_secondary_activate_target(item_stream)

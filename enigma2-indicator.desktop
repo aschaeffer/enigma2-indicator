@@ -1,0 +1,10 @@
+[Desktop Entry]
+Categories=AudioVideo;
+Comment=Enigma 2 channel switch indicator.
+Exec=enigma2-indicator.py
+Hidden=False
+Icon=enigma2-indicator
+Name=Enigma Channel Switcher
+Terminal=false
+Type=Application
+X-GNOME-Autostart-enabled=true

@@ -2,6 +2,11 @@
 
 Indicator for Enigma 2 based set top boxes in the local network.
 
+## Installation
+
+    sudo cp -a enigma2-indicator.py /usr/local/bin
+    xdg-desktop-menu forceupdate enigma2-indicator.desktop
+
 ## Usage
 
     ./enigma2-indicator.py

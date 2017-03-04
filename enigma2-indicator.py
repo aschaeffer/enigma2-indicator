@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 __author__ = "andreasschaeffer"
@@ -15,10 +15,9 @@ import time
 import webbrowser
 import json
 import xml
-import httplib
 import requests
-import urllib
 from xml.etree import ElementTree
+from urllib.parse import quote
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("AppIndicator3", "0.1")
@@ -131,10 +130,7 @@ class Enigma2Client():
 
     def get_services_2(self, service):
         self.services = []
-        # print str(service)
-        # print urllib.quote(service["reference"])
-        # print "http://%s/web/getservices?sRef=%s" %(HOSTNAME, urllib.quote(service["reference"]))
-        response = requests.get("http://%s/web/getservices?sRef=%s" %(HOSTNAME, urllib.quote(service["reference"])))
+        response = requests.get("http://%s/web/getservices?sRef=%s" %(HOSTNAME, quote(service["reference"])))
         tree = ElementTree.fromstring(response.content)
         for service_tag in tree:
             if service_tag.tag == "e2service":
@@ -145,11 +141,10 @@ class Enigma2Client():
                     if service_attr.tag == "e2servicename":
                         service["name"] = service_attr.text
                 self.services.append(service)
-                # print service
         return self.services
 
     def get_epg(self, service):
-        response = requests.get("http://%s/web/epgservice?sRef=%s" %(HOSTNAME, urllib.quote(service["reference"])))
+        response = requests.get("http://%s/web/epgservice?sRef=%s" %(HOSTNAME, quote(service["reference"])))
         tree = ElementTree.fromstring(response.content)
         service["events"] = []
         for e2event_tag in tree:
@@ -169,14 +164,14 @@ class Enigma2Client():
                 service["events"].append(service_event)
 
     def get_current_service_event(self, service):
-        if service.has_key("events"):
+        if "events" in service:
             for service_event in service["events"]:
                 if service_event["start"] < service_event["currenttime"] and service_event["start"] + service_event["duration"] > service_event["currenttime"]:
                     return service_event
         return None
 
     def select_channel(self, widget, service):
-        response = requests.get("http://%s/web/zap?sRef=%s" %(HOSTNAME, urllib.quote(service["reference"])))
+        response = requests.get("http://%s/web/zap?sRef=%s" %(HOSTNAME, quote(service["reference"])))
         self.current_service = service
         self.update_label(service)
 
@@ -189,8 +184,8 @@ class Enigma2Client():
             self.enigma2_indicator.update_label(service["name"])
 
     def stream(self, service):
-        print service["reference"]
-        webbrowser.open("http://%s/web/stream.m3u?ref=%s" %(HOSTNAME, urllib.quote(service["reference"])))
+        print(service["reference"])
+        webbrowser.open("http://%s/web/stream.m3u?ref=%s" %(HOSTNAME, quote(service["reference"])))
 
     def channel_up(self):
         response = requests.get("http://%s/web/remotecontrol?command=403" %(HOSTNAME))
@@ -218,6 +213,9 @@ class FeedbackWatcher(threading.Thread):
             self.current_service = self.enigma_client.get_current_service()
             self.enigma_client.update_label(self.current_service)
 
+    def kill(self):
+        self.ended = True
+
 class GtkUpdater(threading.Thread):
     
     ended = False
@@ -239,6 +237,7 @@ class Enigma2Indicator():
     notification = notify.Notification.new("")
     notifications_initialized = False
     initialized = False
+    gtk_updater = None
 
     def __init__(self):
 
@@ -252,8 +251,8 @@ class Enigma2Indicator():
         self.indicator.set_menu(menu)
         self.indicator.connect("scroll-event", self.scroll)
 
-        gtk_updater = GtkUpdater()
-        gtk_updater.start()
+        self.gtk_updater = GtkUpdater()
+        self.gtk_updater.start()
 
         notify.init(APPINDICATOR_ID)
         self.notification = notify.Notification.new("")
@@ -277,6 +276,12 @@ class Enigma2Indicator():
 
     def quit(self, source):
         self.set_initialized(False)
+        if self.gtk_updater != None:
+            self.gtk_updater.kill()
+            self.gtk_updater.join(8)
+        if self.feedback_watcher != None:
+            self.feedback_watcher.kill()
+            self.feedback_watcher.join(8)
         gtk.main_quit()
 
     def set_initialized(self, initialized):

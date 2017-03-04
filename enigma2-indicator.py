@@ -34,7 +34,8 @@ ICON_PATH = "/usr/share/icons/Humanity/devices/24"
 
 HOSTNAME = "daskaengurutv"
 
-BOUQUET = "userbouquet.andreas_sender__tv_.tv"
+BOUQUET_TV = "userbouquet.andreas_sender__tv_.tv"
+BOUQUET_RADIO = "userbouquet.dbe00.radio"
 
 class Enigma2Client():
 
@@ -69,9 +70,9 @@ class Enigma2Client():
                 self.current_service = service
         return self.current_service
 
-    def get_services(self):
+    def get_services(self, bouquet):
         self.services = []
-        response = requests.get("http://%s/web/getservices?sRef=1:7:1:0:0:0:0:0:0:0:FROM%%20BOUQUET%%20%%22%s%%22%%20ORDER%%20BY%%20bouquet" %(HOSTNAME, BOUQUET))
+        response = requests.get("http://%s/web/getservices?sRef=1:7:1:0:0:0:0:0:0:0:FROM%%20BOUQUET%%20%%22%s%%22%%20ORDER%%20BY%%20bouquet" %(HOSTNAME, bouquet))
         tree = ElementTree.fromstring(response.content)
         for service_tag in tree:
             if service_tag.tag == "e2service":
@@ -206,10 +207,24 @@ class Enigma2Indicator():
     def build_menu(self):
         menu = gtk.Menu()
 
-        for service in self.enigma_client.get_services():
+        menu_tv = gtk.Menu()
+        item_tv = gtk.MenuItem("TV")
+        item_tv.set_submenu(menu_tv)
+
+        for service in self.enigma_client.get_services(BOUQUET_TV):
             item_service = gtk.MenuItem(service["name"])
             item_service.connect("activate", self.enigma_client.select_channel, service)
-            menu.append(item_service)
+            menu_tv.append(item_service)
+        menu.append(item_tv)
+
+        menu_radio = gtk.Menu()
+        item_radio = gtk.MenuItem("Radio")
+        item_radio.set_submenu(menu_radio)
+        for service in self.enigma_client.get_services(BOUQUET_RADIO):
+            item_service = gtk.MenuItem(service["name"])
+            item_service.connect("activate", self.enigma_client.select_channel, service)
+            menu_radio.append(item_service)
+        menu.append(item_radio)
 
         menu.append(gtk.SeparatorMenuItem())
 

@@ -2,7 +2,8 @@
 
 Indicator for Enigma 2 based set top boxes in the local network.
 
-![Screenshot](/screenshot.png?raw=true "Enigma 2 Indicator")
+![Screenshot Enigma2 Indicator](/screenshot-enigma2-indicator.png?raw=true "Enigma2 Indicator")
+![Screenshot Sound Menu](/screenshot-sound-menu.png?raw=true "Sound Menu Integration")
 
 ## Features
 

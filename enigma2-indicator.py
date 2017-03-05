@@ -620,12 +620,24 @@ class Enigma2Indicator():
         if service:
             try:
                 filename = "%s.png" %(service["reference"][:-1].replace(":", "_"))
-                local_path = "/tmp/%s" %(filename)
                 url = "http://%s/picon/%s" %(config["hostname"], filename)
+                local_path = "/tmp/%s" %(filename)
                 if not os.path.exists(local_path):
-                    f = open(local_path, "wb")
-                    f.write(requests.get(url).content)
-                    f.close()
+                    r = requests.get(url)
+                    if r.status_code == 200:
+                        f = open(local_path, "wb")
+                        f.write(r.content)
+                        f.close()
+                    else:
+                        filename = "%s.png" %(service["name"].lower().replace(" ", ""))
+                        url = "http://%s/picon/%s" %(config["hostname"], filename)
+                        local_path = "/tmp/%s" %(filename)
+                        if not os.path.exists(local_path):
+                            r = requests.get(url)
+                            if r.status_code == 200:
+                                f = open(local_path, "wb")
+                                f.write(r.content)
+                                f.close()
                 if os.path.exists(local_path):
                     self.indicator.set_icon(local_path)
                 else:

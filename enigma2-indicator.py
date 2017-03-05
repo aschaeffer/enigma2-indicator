@@ -198,8 +198,10 @@ class Enigma2Client():
         current_service_event = self.get_current_service_event(service)
         if current_service_event != None:
             self.enigma2_indicator.update_label("%s: %s" %(service["name"], current_service_event["title"]))
+            self.enigma2_indicator.update_icon(service)
         else:
             self.enigma2_indicator.update_label(service["name"])
+            self.enigma2_indicator.update_icon(service)
 
     def stream(self, service):
         webbrowser.open("http://%s/web/stream.m3u?ref=%s" %(HOSTNAME, quote(service["reference"])))
@@ -539,6 +541,16 @@ class Enigma2Indicator():
 
     def update_label(self, text = None):
         self.indicator.set_label(text, "")
+
+    def update_icon(self, service):
+        filename = '%s.png' %(service["reference"][:-1].replace(":", "_"))
+        local_path = '/tmp/%s' %(filename)
+        url = 'http://%s/picon/%s' %(HOSTNAME, filename)
+        if not os.path.exists(local_path):
+            f = open(local_path, 'wb')
+            f.write(requests.get(url).content)
+            f.close()
+        self.indicator.set_icon(local_path)
 
     def scroll(self, indicator, steps, direction):
         if direction == gdk.ScrollDirection.DOWN:

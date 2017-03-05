@@ -2,6 +2,8 @@
 
 Indicator for Enigma 2 based set top boxes in the local network.
 
+![Screenshot](/screenshot.png?raw=true "Enigma 2 Indicator")
+
 ## Installation
 
     git clone https://github.com/aschaeffer/enigma2-indicator.git

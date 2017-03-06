@@ -22,15 +22,16 @@ Indicator for Enigma 2 based set top boxes in the local network.
 
     git clone https://github.com/aschaeffer/enigma2-indicator.git
     cd enigma2-indicator
-    sudo cp -a enigma2-indicator.py /usr/local/bin
-    sudo cp -a enigma2-indicator.png /usr/share/pixmaps
-    sudo xdg-desktop-menu install enigma2-indicator.desktop
-    gsettings get com.canonical.indicator.sound interested-media-players
-    gsettings set com.canonical.indicator.sound interested-media-players "['audacious.desktop', 'vlc.desktop', 'smplayer.desktop', 'sony-av-indicator.desktop', 'enigma2-indicator.desktop']"
+    sudo -H pip install . --no-cache-dir --upgrade
+    gsettings set com.canonical.indicator.sound interested-media-players "['e2indicator.desktop']"
 
 ## Usage
 
-    ./enigma2-indicator.py
+Just launch the enigma2 indicator from the sound menu.
+
+## Usage Command Line
+
+    $ e2indicator
 
 ## System requirements
 

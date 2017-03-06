@@ -1,9 +1,9 @@
 [Desktop Entry]
 Categories=AudioVideo;
 Comment=Enigma 2 channel switch indicator.
-Exec=enigma2-indicator.py
+Exec=e2indicator
 Hidden=False
-Icon=enigma2-indicator
+Icon=e2indicator
 Name=Enigma Channel Switcher
 Terminal=false
 Type=Application

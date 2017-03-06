@@ -204,32 +204,44 @@ class Enigma2Client():
     def get_epg(self, service):
         try:
             if "type" in service and service["type"] == "stream":
+                service_event = {}
+                service_event["id"] = 0
+                service_event["start"] = int(time.time()) - 10
+                service_event["duration"] = 60000
+                service_event["currenttime"] = int(time.time()) + 1
+                service_event["remaining"] = (service_event["start"] + service_event["duration"]) - service_event["currenttime"]
+                service_event["reference"] = service["reference"]
+                service_event["service"] = service["name"]
+                service_event["title"] = " "
+                service_event["description"] = " "
+                service_event["descriptionextended"] = " "
                 if service["streamtype"] == "radio":
-                    service_event = {}
-                    service_event["id"] = 0
-                    service_event["reference"] = service["reference"]
-                    service_event["start"] = int(time.time()) - 10
-                    service_event["duration"] = 60000
-                    service_event["currenttime"] = int(time.time()) + 1
-                    service_event["remaining"] = (service_event["start"] + service_event["duration"]) - service_event["currenttime"]
                     try:
                         stationinfo = self.streamscrobbler.getServerInfo(service["streamurl"])
                         metadata = stationinfo.get("metadata")
                         service_event["title"] = metadata["song"]
                     except:
                         self.logger.exception("Failed to get current song from radio stream")
-                        service_event["title"] = ""
-                    service["events"] = []
-                    service["events"].append(service_event)
-                else:
-                    pass
+                service["events"] = []
+                service["events"].append(service_event)
             else:
                 response = requests.get("http://%s/web/epgservice?sRef=%s" %(config["hostname"], quote(service["reference"])))
                 tree = ElementTree.fromstring(response.content)
                 service["events"] = []
                 for e2event_tag in tree:
                     if e2event_tag.tag == "e2event":
-                        service_event = {}
+                        service_event = {
+                            "id": 0,
+                            "reference": service["reference"],
+                            "service": service["name"],
+                            "title": " ",
+                            "description": " ",
+                            "descriptionextended": " ",
+                            "start": 0,
+                            "duration": 0,
+                            "currenttime": 0,
+                            "remaining": 0
+                            }
                         for e2event_attr in e2event_tag:
                             if e2event_attr.tag == "e2eventid":
                                 service_event["id"] = e2event_attr.text
@@ -296,7 +308,11 @@ class Enigma2Client():
             self.enigma2_indicator.update_icon(None)
 
     def stream(self, service):
-        webbrowser.open("http://%s/web/stream.m3u?ref=%s" %(config["hostname"], quote(service["reference"])))
+        if "type" in service and service["type"] == "stream":
+            self.logger.debug("Open stream %s" %(service["streamurl"]))
+            webbrowser.open(service["streamurl"])
+        else:
+            webbrowser.open("http://%s/web/stream.m3u?ref=%s" %(config["hostname"], quote(service["reference"])))
 
     def channel_up(self):
         response = requests.get("http://%s/web/remotecontrol?command=403" %(config["hostname"]))
@@ -509,9 +525,10 @@ class MprisServer(threading.Thread, dbus.service.Object):
             metadata = {
                 "mpris:trackid": service["reference"],
                 "mpris:length": 0,
-                "xesam:title": "",
+                "xesam:title": " ",
                 "xesam:artist": service["name"],
-                "xesam:album": "",
+                "xesam:album": " ",
+                "xesam:comment": " ",
                 "mpris:artUrl": self.enigma_client.get_picon_url(service)
             }
             if self.current_service_event:
@@ -521,9 +538,9 @@ class MprisServer(threading.Thread, dbus.service.Object):
                     metadata["xesam:title"] = self.current_service_event["title"]
                 if "description" in self.current_service_event:
                     metadata["xesam:album"] = self.current_service_event["description"]
-                elif "descriptionextended" in self.current_service_event:
+                elif "descriptionextended" in self.current_service_event and self.current_service_event["descriptionextended"]:
                     metadata["xesam:album"] = self.current_service_event["descriptionextended"]
-                if "descriptionextended" in self.current_service_event:
+                if "descriptionextended" in self.current_service_event and self.current_service_event["descriptionextended"]:
                     metadata["xesam:comment"] = self.current_service_event["descriptionextended"]
                 if "duration" in self.current_service_event:
                     metadata["mpris:length"] = dbus.Int64(self.current_service_event["duration"] * 1000)
@@ -533,9 +550,11 @@ class MprisServer(threading.Thread, dbus.service.Object):
             return dbus.Dictionary({
                     "mpris:trackid": "",
                     "mpris:length": 0,
-                    "xesam:title": "",
-                    "xesam:artist": "",
-                    "mpris:artUrl": ""
+                    "xesam:title": " ",
+                    "xesam:artist": " ",
+                    "mpris:artUrl": " ",
+                    "xesam:album": " ",
+                    "xesam:comment": " ",
                 }, signature = "sv")
 
     def get_position(self):
@@ -623,6 +642,7 @@ class MprisServer(threading.Thread, dbus.service.Object):
     def update(self):
         try:
             self.update_metadata()
+            self.logger.debug(str(self.get_metadata()))
             self.PropertiesChanged(PLAYER_INTERFACE, { "Metadata": self.get_metadata() }, [])
         except Exception as e:
             self.logger.exception("Failed to update metadata")

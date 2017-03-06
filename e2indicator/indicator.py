@@ -41,7 +41,7 @@ class Enigma2Indicator():
     initialized = False
     gtk_updater = None
     config = {
-        "hostname": "localhost",
+        "hostname": "daskaengurutv",
         "showStationIcon": True,
         "showStationName": True,
         "showCurrentShowTitle": True
@@ -74,9 +74,9 @@ class Enigma2Indicator():
         self.enigma_client = Enigma2Client(self)
 
         self.update_label("Loading...")
-        # self.enigma_client.update_bouquets()
+        self.enigma_client.update_bouquets()
         self.indicator.set_menu(self.build_menu())
-        
+
         current_service = self.enigma_client.get_current_service_stream()
         self.enigma_client.update_label(current_service)
 

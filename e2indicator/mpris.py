@@ -131,40 +131,39 @@ class MprisServer(threading.Thread, dbus.service.Object):
                     "mpris:artUrl": self.enigma_client.get_picon_url(service)
                 }
                 if self.current_service_event:
-                    if "id" in self.current_service_event:
+                    if "id" in self.current_service_event and self.current_service_event["id"]:
                         metadata["mpris:trackid"] = self.current_service_event["id"]
-                    if "title" in self.current_service_event:
+                    if "title" in self.current_service_event and self.current_service_event["title"]:
                         metadata["xesam:title"] = self.current_service_event["title"]
-                    if "description" in self.current_service_event:
+                    if "description" in self.current_service_event and self.current_service_event["description"]:
                         metadata["xesam:album"] = self.current_service_event["description"]
                     elif "descriptionextended" in self.current_service_event and self.current_service_event["descriptionextended"]:
                         metadata["xesam:album"] = self.current_service_event["descriptionextended"]
                     if "descriptionextended" in self.current_service_event and self.current_service_event["descriptionextended"]:
                         metadata["xesam:comment"] = self.current_service_event["descriptionextended"]
-                    if "duration" in self.current_service_event:
+                    if "duration" in self.current_service_event and self.current_service_event["duration"]:
                         metadata["mpris:length"] = dbus.Int64(self.current_service_event["duration"] * 1000)
+                self.logger.info(str(metadata))
                 return dbus.Dictionary(metadata, signature = "sv")
             else:
-                return dbus.Dictionary({
-                    "mpris:trackid": "",
-                    "mpris:length": 0,
-                    "xesam:title": " ",
-                    "xesam:artist": " ",
-                    "mpris:artUrl": " ",
-                    "xesam:album": " ",
-                    "xesam:comment": " ",
-                }, signature = "sv")
+                return self.get_empty_dbus_dict()
         except:
             self.logger.exception("Failed to get metadata")
-            return dbus.Dictionary({
-                "mpris:trackid": "",
-                "mpris:length": 0,
-                "xesam:title": " ",
-                "xesam:artist": " ",
-                "mpris:artUrl": " ",
-                "xesam:album": " ",
-                "xesam:comment": " ",
-            }, signature = "sv")
+            return self.get_empty_dbus_dict()
+
+    def get_empty_dbus_dict(self):
+        return dbus.Dictionary(self.get_empty_metadata_dict(), signature = "sv")
+
+    def get_empty_metadata_dict(self):
+        return {
+            "mpris:trackid": "",
+            "mpris:length": 0,
+            "xesam:title": " ",
+            "xesam:artist": " ",
+            "mpris:artUrl": " ",
+            "xesam:album": " ",
+            "xesam:comment": " ",
+        }
 
     def get_position(self):
         if "currenttime" in self.current_service_event and "start" in self.current_service_event:
@@ -251,7 +250,6 @@ class MprisServer(threading.Thread, dbus.service.Object):
     def update(self):
         try:
             self.update_metadata()
-            self.logger.debug(str(self.get_metadata()))
             self.PropertiesChanged(PLAYER_INTERFACE, { "Metadata": self.get_metadata() }, [])
         except Exception as e:
             self.logger.exception("Failed to update metadata")

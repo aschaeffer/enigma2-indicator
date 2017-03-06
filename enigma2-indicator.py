@@ -22,6 +22,10 @@ import dbus.service
 import copy
 from xml.etree import ElementTree
 from urllib.parse import quote
+try:
+    from streamscrobbler import streamscrobbler
+except:
+    pass
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("AppIndicator3", "0.1")
@@ -65,6 +69,7 @@ class Enigma2Client():
     current_service = None
     services = []
     enigma2_indicator = None
+    streamscrobbler = None
     bouquets = {}
 
     logger = logging.getLogger("enigma2-client")
@@ -73,6 +78,10 @@ class Enigma2Client():
         self.bouquets["tv"] = []
         self.bouquets["radio"] = []
         self.enigma2_indicator = enigma2_indicator
+        try:
+            self.streamscrobbler = streamscrobbler()
+        except:
+            pass
 
     def update_bouquets(self):
         self.get_bouquets_tv()
@@ -95,6 +104,32 @@ class Enigma2Client():
                 for service_attr in service_tag:
                     if service_attr.tag == "e2servicereference":
                         service["reference"] = service_attr.text
+                    if service_attr.tag == "e2servicename":
+                        service["name"] = service_attr.text
+                self.current_service = service
+        return self.current_service
+
+    def get_current_service_stream(self):
+        response = requests.get("http://%s/web/streamsubservices" %(config["hostname"]))
+        tree = ElementTree.fromstring(response.content)
+        for service_tag in tree:
+            if service_tag.tag == "e2service":
+                service = {}
+                for service_attr in service_tag:
+                    if service_attr.tag == "e2servicereference":
+                        service["reference"] = service_attr.text
+                        if service_attr.text.split(":")[0] == "4097":
+                            service["type"] = "stream"
+                            service["streamurl"] = service_attr.text.split(":")[10].replace("%3a", ":")
+                            if service_attr.text.split(":")[2] == "0":
+                                service["streamtype"] = "tv"
+                            elif service_attr.text.split(":")[2] == "2":
+                                service["streamtype"] = "radio"
+                            else:
+                                service["streamtype"] = "stream"
+                            self.logger.info("Stream Type: %s Stream URL: %s" %(service["streamtype"], service["streamurl"]))
+                        else:
+                            service["type"] = "normal"
                     if service_attr.tag == "e2servicename":
                         service["name"] = service_attr.text
                 self.current_service = service
@@ -167,34 +202,58 @@ class Enigma2Client():
         return self.services
 
     def get_epg(self, service):
-        response = requests.get("http://%s/web/epgservice?sRef=%s" %(config["hostname"], quote(service["reference"])))
-        tree = ElementTree.fromstring(response.content)
-        service["events"] = []
-        for e2event_tag in tree:
-            if e2event_tag.tag == "e2event":
-                service_event = {}
-                for e2event_attr in e2event_tag:
-                    if e2event_attr.tag == "e2eventid":
-                        service_event["id"] = e2event_attr.text
-                    if e2event_attr.tag == "e2eventservicereference":
-                        service_event["reference"] = e2event_attr.text
-                    if e2event_attr.tag == "e2eventservicename":
-                        service_event["service"] = e2event_attr.text
-                    if e2event_attr.tag == "e2eventtitle":
-                        service_event["title"] = e2event_attr.text
-                    if e2event_attr.tag == "e2eventdescription":
-                        service_event["description"] = e2event_attr.text
-                    if e2event_attr.tag == "e2eventdescriptionextended":
-                        service_event["descriptionextended"] = e2event_attr.text
-                    if e2event_attr.tag == "e2eventstart":
-                        service_event["start"] = int(e2event_attr.text)
-                    if e2event_attr.tag == "e2eventduration":
-                        service_event["duration"] = int(e2event_attr.text)
-                    if e2event_attr.tag == "e2eventcurrenttime":
-                        service_event["currenttime"] = int(e2event_attr.text)
-                    if e2event_attr.tag == "e2eventremaining":
-                        service_event["remaining"] = int(e2event_attr.text)
-                service["events"].append(service_event)
+        try:
+            if "type" in service and service["type"] == "stream":
+                if service["streamtype"] == "radio":
+                    service_event = {}
+                    service_event["id"] = 0
+                    service_event["reference"] = service["reference"]
+                    service_event["start"] = int(time.time()) - 10
+                    service_event["duration"] = 60000
+                    service_event["currenttime"] = int(time.time()) + 1
+                    service_event["remaining"] = (service_event["start"] + service_event["duration"]) - service_event["currenttime"]
+                    try:
+                        stationinfo = self.streamscrobbler.getServerInfo(service["streamurl"])
+                        metadata = stationinfo.get("metadata")
+                        service_event["title"] = metadata["song"]
+                    except:
+                        self.logger.exception("Failed to get current song from radio stream")
+                        service_event["title"] = ""
+                    service["events"] = []
+                    service["events"].append(service_event)
+                else:
+                    pass
+            else:
+                response = requests.get("http://%s/web/epgservice?sRef=%s" %(config["hostname"], quote(service["reference"])))
+                tree = ElementTree.fromstring(response.content)
+                service["events"] = []
+                for e2event_tag in tree:
+                    if e2event_tag.tag == "e2event":
+                        service_event = {}
+                        for e2event_attr in e2event_tag:
+                            if e2event_attr.tag == "e2eventid":
+                                service_event["id"] = e2event_attr.text
+                            if e2event_attr.tag == "e2eventservicereference":
+                                service_event["reference"] = e2event_attr.text
+                            if e2event_attr.tag == "e2eventservicename":
+                                service_event["service"] = e2event_attr.text
+                            if e2event_attr.tag == "e2eventtitle":
+                                service_event["title"] = e2event_attr.text
+                            if e2event_attr.tag == "e2eventdescription":
+                                service_event["description"] = e2event_attr.text
+                            if e2event_attr.tag == "e2eventdescriptionextended":
+                                service_event["descriptionextended"] = e2event_attr.text
+                            if e2event_attr.tag == "e2eventstart":
+                                service_event["start"] = int(e2event_attr.text)
+                            if e2event_attr.tag == "e2eventduration":
+                                service_event["duration"] = int(e2event_attr.text)
+                            if e2event_attr.tag == "e2eventcurrenttime":
+                                service_event["currenttime"] = int(e2event_attr.text)
+                            if e2event_attr.tag == "e2eventremaining":
+                                service_event["remaining"] = int(e2event_attr.text)
+                        service["events"].append(service_event)
+        except:
+            self.logger.exception("Failed to get EPG")
 
     def get_current_service_event(self, service):
         if "events" in service:
@@ -241,15 +300,15 @@ class Enigma2Client():
 
     def channel_up(self):
         response = requests.get("http://%s/web/remotecontrol?command=403" %(config["hostname"]))
-        self.update_label(self.get_current_service())
+        self.update_label(self.get_current_service_stream())
 
     def channel_down(self):
         response = requests.get("http://%s/web/remotecontrol?command=402" %(config["hostname"]))
-        self.update_label(self.get_current_service())
+        self.update_label(self.get_current_service_stream())
 
     def set_power_state(self, state):
         response = requests.get("http://%s/web/powerstate?newstate=%d" %(config["hostname"], state))
-        self.update_label(self.get_current_service())
+        self.update_label(self.get_current_service_stream())
 
     def power_standby(self, widget = None):
         self.set_power_state(0)
@@ -265,6 +324,43 @@ class Enigma2Client():
 
     def power_wake_up(self, widget = None):
         self.set_power_state(116)
+
+    def get_picon(self, service):
+        try:
+            filename = "%s.png" %(service["reference"][:-1].replace(":", "_"))
+            url = "http://%s/picon/%s" %(config["hostname"], filename)
+            local_path = "/tmp/%s" %(filename)
+            filename2 = "%s.png" %(service["name"].lower().replace(" ", ""))
+            url2 = "http://%s/picon/%s" %(config["hostname"], filename2)
+            local_path2 = "/tmp/%s" %(filename2)
+            if not os.path.exists(local_path):
+                if not os.path.exists(local_path2):
+                    r = requests.get(url)
+                    if r.status_code == 200:
+                        f = open(local_path, "wb")
+                        f.write(r.content)
+                        f.close()
+                        return local_path
+                    else:
+                        r = requests.get(url)
+                        if r.status_code == 200:
+                            f = open(local_path, "wb")
+                            f.write(r.content)
+                            f.close()
+                            return local_path2
+                        else:
+                            return self.enigma2_indicator.get_icon_path(self.enigma2_indicator.get_icon())
+                else:
+                    return local_path2
+            else:
+                return local_path
+            return self.enigma2_indicator.get_icon_path(self.enigma2_indicator.get_icon())
+        except Exception as e:
+            self.logger.exception("Failed to update icon")
+            return self.enigma2_indicator.get_icon_path(self.enigma2_indicator.get_icon())
+
+    def get_picon_url(self, service):
+        return "file://%s" %(self.get_picon(service))
 
 
 class FeedbackWatcher(threading.Thread):
@@ -286,7 +382,7 @@ class FeedbackWatcher(threading.Thread):
 
     def run(self):
         while not self.ended:
-            self.current_service = self.enigma_client.get_current_service()
+            self.current_service = self.enigma_client.get_current_service_stream()
             self.enigma_client.update_label(self.current_service)
             self.mpris_server.update()
             time.sleep(10.0)
@@ -401,31 +497,35 @@ class MprisServer(threading.Thread, dbus.service.Object):
         return True
 
     def update_metadata(self):
-        self.enigma_client.get_epg(self.enigma_client.current_service)
-        self.current_service_event = self.enigma_client.get_current_service_event(self.enigma_client.current_service)
+        if self.enigma_client.current_service:
+            service = self.enigma_client.current_service
+            self.enigma_client.get_epg(service)
+            self.current_service_event = self.enigma_client.get_current_service_event(service)
 
     def get_metadata(self):
-        self.logger.debug("Get Metadata")
         try:
             service = self.enigma_client.current_service
+            self.logger.debug("Get Metadata for %s" %(service["reference"]))
             metadata = {
                 "mpris:trackid": service["reference"],
                 "mpris:length": 0,
                 "xesam:title": "",
                 "xesam:artist": service["name"],
                 "xesam:album": "",
-                "mpris:artUrl": "http://%s/picon/%s.png" %(config["hostname"], service["reference"][:-1].replace(":", "_"))
+                "mpris:artUrl": self.enigma_client.get_picon_url(service)
             }
             if self.current_service_event:
-                if self.current_service_event["id"]:
+                if "id" in self.current_service_event:
                     metadata["mpris:trackid"] = self.current_service_event["id"]
-                if self.current_service_event["title"]:
+                if "title" in self.current_service_event:
                     metadata["xesam:title"] = self.current_service_event["title"]
-                if self.current_service_event["description"]:
+                if "description" in self.current_service_event:
                     metadata["xesam:album"] = self.current_service_event["description"]
-                if self.current_service_event["descriptionextended"]:
+                elif "descriptionextended" in self.current_service_event:
+                    metadata["xesam:album"] = self.current_service_event["descriptionextended"]
+                if "descriptionextended" in self.current_service_event:
                     metadata["xesam:comment"] = self.current_service_event["descriptionextended"]
-                if self.current_service_event["duration"]:
+                if "duration" in self.current_service_event:
                     metadata["mpris:length"] = dbus.Int64(self.current_service_event["duration"] * 1000)
             return dbus.Dictionary(metadata, signature = "sv")
         except:
@@ -439,7 +539,10 @@ class MprisServer(threading.Thread, dbus.service.Object):
                 }, signature = "sv")
 
     def get_position(self):
-        return dbus.Int64((self.current_service_event["currenttime"] - self.current_service_event["start"]) * 1000)
+        if "currenttime" in self.current_service_event and "start" in self.current_service_event:
+            return dbus.Int64((self.current_service_event["currenttime"] - self.current_service_event["start"]) * 1000)
+        else:
+            return 0
 
     def get_volume(self):
         return 1.0
@@ -575,7 +678,7 @@ class Enigma2Indicator():
         self.enigma_client.update_bouquets()
         self.indicator.set_menu(self.build_menu())
         
-        current_service = self.enigma_client.get_current_service()
+        current_service = self.enigma_client.get_current_service_stream()
         self.enigma_client.update_label(current_service)
 
         self.mpris_server = MprisServer(self, self.enigma_client)
@@ -618,33 +721,7 @@ class Enigma2Indicator():
 
     def update_icon(self, service):
         if service:
-            try:
-                filename = "%s.png" %(service["reference"][:-1].replace(":", "_"))
-                url = "http://%s/picon/%s" %(config["hostname"], filename)
-                local_path = "/tmp/%s" %(filename)
-                if not os.path.exists(local_path):
-                    r = requests.get(url)
-                    if r.status_code == 200:
-                        f = open(local_path, "wb")
-                        f.write(r.content)
-                        f.close()
-                    else:
-                        filename = "%s.png" %(service["name"].lower().replace(" ", ""))
-                        url = "http://%s/picon/%s" %(config["hostname"], filename)
-                        local_path = "/tmp/%s" %(filename)
-                        if not os.path.exists(local_path):
-                            r = requests.get(url)
-                            if r.status_code == 200:
-                                f = open(local_path, "wb")
-                                f.write(r.content)
-                                f.close()
-                if os.path.exists(local_path):
-                    self.indicator.set_icon(local_path)
-                else:
-                    self.indicator.set_icon(self.get_icon_path(self.get_icon()))
-            except Exception as e:
-                self.logger.exception("Failed to update icon")
-                self.indicator.set_icon(self.get_icon_path(self.get_icon()))
+            self.indicator.set_icon(self.enigma_client.get_picon(service))
         else:
             self.indicator.set_icon(self.get_icon_path(self.get_icon()))
 

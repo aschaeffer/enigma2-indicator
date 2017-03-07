@@ -4,6 +4,7 @@
 import logging
 import os
 import requests
+import time
 import webbrowser
 from xml.etree import ElementTree
 from urllib.parse import quote
@@ -45,20 +46,6 @@ class Enigma2Client():
                 self.model = child.text
         return self.model
 
-#    def get_current_service(self):
-#        response = requests.get("http://%s/web/subservices" %(self.enigma2_indicator.config["hostname"]))
-#        tree = ElementTree.fromstring(response.content)
-#        for service_tag in tree:
-#            if service_tag.tag == "e2service":
-#                service = {}
-#                for service_attr in service_tag:
-#                    if service_attr.tag == "e2servicereference":
-#                        service["reference"] = service_attr.text
-#                    if service_attr.tag == "e2servicename":
-#                        service["name"] = service_attr.text
-#                self.current_service = service
-#        return self.current_service
-
     def get_current_service_stream(self):
         self.current_service = self.get_empty_service()
         try:
@@ -78,7 +65,7 @@ class Enigma2Client():
                                     self.current_service["streamtype"] = "radio"
                                 else:
                                     self.current_service["streamtype"] = "stream"
-                                self.logger.info("Stream Type: %s Stream URL: %s" %(service["streamtype"], service["streamurl"]))
+                                self.logger.info("Stream Type: %s Stream URL: %s" %(self.current_service["streamtype"], self.current_service["streamurl"]))
                             else:
                                 self.current_service["type"] = "normal"
                         if service_attr.tag == "e2servicename":

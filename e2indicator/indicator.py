@@ -79,7 +79,7 @@ class Enigma2Indicator():
         self.enigma_state = Enigma2State()
         self.enigma_client = Enigma2Client(self, self.enigma_config, self.enigma_state)
 
-        self.update_label("Loading Bouquets...")
+        self.update_label("%s: Loading Bouquets..." %(self.enigma_config["model"]))
 
         self.enigma_client.update_bouquets()
         self.indicator.set_menu(self.build_menu())
@@ -231,6 +231,11 @@ class Enigma2Indicator():
         item_power_wake_up.connect("activate", self.enigma_client.power_wake_up)
         menu_power.append(item_power_wake_up)
         menu.append(item_power)
+
+        menu.append(gtk.SeparatorMenuItem())
+
+        item_model = gtk.MenuItem(self.enigma_config["model"])
+        menu.append(item_model)
 
         menu.append(gtk.SeparatorMenuItem())
 

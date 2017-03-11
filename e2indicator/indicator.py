@@ -70,18 +70,17 @@ class Enigma2Indicator():
 
         signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-        self.enigma_config = Enigma2Config()
+        self.update_label("Search for Devices...")
         
-        self.enigma_device = Enigma2DeviceService()
-        if not self.enigma_device.is_enigma(self.enigma_config["hostname"]):
-            if self.enigma_device.find_device():
-                self.enigma_config["hostname"] = self.enigma_device.ip
-                self.enigma_config["model"] = self.enigma_device.model
+        self.enigma_config = Enigma2Config()
+
+        self.enigma_device = Enigma2DeviceService(self.enigma_config)
         
         self.enigma_state = Enigma2State()
         self.enigma_client = Enigma2Client(self, self.enigma_config, self.enigma_state)
 
-        self.update_label("Loading...")
+        self.update_label("Loading Bouquets...")
+
         self.enigma_client.update_bouquets()
         self.indicator.set_menu(self.build_menu())
 

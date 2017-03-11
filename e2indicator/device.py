@@ -39,6 +39,8 @@ class ScanPort(threading.Thread):
 
 class Enigma2DeviceService():
 
+    enigma_config = None
+
     initialized = False
     my_ip = None
     my_network = None
@@ -48,10 +50,15 @@ class Enigma2DeviceService():
 
     logger = logging.getLogger("e2-device")
 
-    def __init__(self):
+    def __init__(self, enigma_config):
+        self.enigma_config = enigma_config
         self.my_ip = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
         self.my_network = self.my_ip.rsplit(".", 1)[0]
         self.logger.info("Network: %s IP: %s" %(self.my_network, self.my_ip))
+        if not self.is_enigma(self.enigma_config["hostname"]):
+            if self.find_device():
+                self.enigma_config["hostname"] = self.ip
+                self.enigma_config["model"] = self.model
 
     def find_device(self):
         self.logger.info("Searching for enigma2 devices in %s.*" %(self.my_network))

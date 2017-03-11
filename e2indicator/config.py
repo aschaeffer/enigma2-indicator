@@ -33,9 +33,22 @@ class Enigma2Config(dict):
                 self.logger.info(str(config))
                 for key, value in config.items():
                     self[key] = value
+            if "hostname" not in self:
+                self["hostname"] = "localhost"
+            if "model" not in self:
+                self["model"] = ""
+            if "showStationIcon" not in self:
+                self["showStationIcon"] = True
+            if "showStationName" not in self:
+                self["showStationName"] = True
+            if "showCurrentShowTitle" not in self:
+                self["showCurrentShowTitle"] = True
+            if "updateDelay" not in self:
+                self["updateDelay"] = 5.0
         except:
-            self.logger.exception("Couldn't load config")
-            self["hostname"] = "daskaengurutv"
+            self.logger.exception("Couldn't load config, using defaults")
+            self["hostname"] = "localhost"
+            self["model"] = ""
             self["showStationIcon"] = True
             self["showStationName"] = True
             self["showCurrentShowTitle"] = True

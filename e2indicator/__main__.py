@@ -3,7 +3,10 @@
 
 import sys
 import logging
-from e2indicator.indicator import Enigma2Indicator
+try:
+    from indicator import Enigma2Indicator
+except:
+    from e2indicator.indicator import Enigma2Indicator
 
 logging.basicConfig(level = logging.INFO, format = "%(asctime)-15s [%(name)-5s] [%(levelname)-5s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 

@@ -20,18 +20,18 @@ PROPERTIES_INTERFACE = "org.freedesktop.DBus.Properties"
 
 class MprisServer(threading.Thread, dbus.service.Object):
 
-    enigma2_indicator = None
     enigma_client = None
+    enigma_state = None
     properties = None
     bus = None
     ended = False
 
     logger = logging.getLogger("e2indicator-mpris")
 
-    def __init__(self, enigma2_indicator, enigma_client):
+    def __init__(self, enigma_client, enigma_state):
         threading.Thread.__init__(self)
-        self.enigma2_indicator = enigma2_indicator
         self.enigma_client = enigma_client
+        self.enigma_state = enigma_state
         self.properties = {
             ROOT_INTERFACE: self._get_root_iface_properties(),
             PLAYER_INTERFACE: self._get_player_iface_properties()
@@ -110,47 +110,6 @@ class MprisServer(threading.Thread, dbus.service.Object):
     def can_control(self):
         return True
 
-    def update_metadata(self):
-        if self.enigma_client.current_service:
-            service = self.enigma_client.current_service
-            self.enigma_client.get_epg(service)
-            self.current_service_event = self.enigma_client.get_current_service_event(service)
-
-    def get_metadata(self):
-        try:
-            if self.enigma_client.current_service:
-                service = self.enigma_client.current_service
-                self.logger.debug("Get Metadata for %s" %(service["reference"]))
-                metadata = {
-                    "mpris:trackid": service["reference"],
-                    "mpris:length": 0,
-                    "xesam:title": " ",
-                    "xesam:artist": service["name"],
-                    "xesam:album": " ",
-                    "xesam:comment": " ",
-                    "mpris:artUrl": self.enigma_client.get_picon_url(service)
-                }
-                if self.current_service_event:
-                    if "id" in self.current_service_event and self.current_service_event["id"]:
-                        metadata["mpris:trackid"] = self.current_service_event["id"]
-                    if "title" in self.current_service_event and self.current_service_event["title"]:
-                        metadata["xesam:title"] = self.current_service_event["title"]
-                    if "description" in self.current_service_event and self.current_service_event["description"]:
-                        metadata["xesam:album"] = self.current_service_event["description"]
-                    elif "descriptionextended" in self.current_service_event and self.current_service_event["descriptionextended"]:
-                        metadata["xesam:album"] = self.current_service_event["descriptionextended"]
-                    if "descriptionextended" in self.current_service_event and self.current_service_event["descriptionextended"]:
-                        metadata["xesam:comment"] = self.current_service_event["descriptionextended"]
-                    if "duration" in self.current_service_event and self.current_service_event["duration"]:
-                        metadata["mpris:length"] = dbus.Int64(self.current_service_event["duration"] * 1000)
-                self.logger.info(str(metadata))
-                return dbus.Dictionary(metadata, signature = "sv")
-            else:
-                return self.get_empty_dbus_dict()
-        except:
-            self.logger.exception("Failed to get metadata")
-            return self.get_empty_dbus_dict()
-
     def get_empty_dbus_dict(self):
         return dbus.Dictionary(self.get_empty_metadata_dict(), signature = "sv")
 
@@ -166,8 +125,8 @@ class MprisServer(threading.Thread, dbus.service.Object):
         }
 
     def get_position(self):
-        if "currenttime" in self.current_service_event and "start" in self.current_service_event:
-            return dbus.Int64((self.current_service_event["currenttime"] - self.current_service_event["start"]) * 1000)
+        if "currenttime" in self.enigma_state.current_service_event and "start" in self.enigma_state.current_service_event:
+            return dbus.Int64((self.enigma_state.current_service_event["currenttime"] - self.enigma_state.current_service_event["start"]) * 1000)
         else:
             return 0
 
@@ -179,30 +138,28 @@ class MprisServer(threading.Thread, dbus.service.Object):
 
     @dbus.service.method(PLAYER_INTERFACE)
     def Pause(self):
-        pass
+        self.update()
 
     @dbus.service.method(PLAYER_INTERFACE)
     def PlayPause(self):
-        pass
+        self.update()
 
     @dbus.service.method(PLAYER_INTERFACE)
     def Play(self):
-        pass
+        self.update()
 
     @dbus.service.method(PLAYER_INTERFACE)
     def Stop(self):
-        pass
+        self.update()
 
     @dbus.service.method(PLAYER_INTERFACE)
     def Next(self):
         self.enigma_client.channel_down()
-        time.sleep(1.0)
         self.update()
 
     @dbus.service.method(PLAYER_INTERFACE)
     def Previous(self):
         self.enigma_client.channel_up()
-        time.sleep(1.0)
         self.update()
 
     # --- Properties interface
@@ -240,26 +197,55 @@ class MprisServer(threading.Thread, dbus.service.Object):
 
     @dbus.service.method(dbus_interface=ROOT_INTERFACE)
     def Raise(self):
-        self.enigma2_indicator.open_web_ui(None)
+        self.client.open_web_ui()
 
     @dbus.service.method(dbus_interface=ROOT_INTERFACE)
     def Quit(self):
         self.logger.debug("%s.Quit called" %(ROOT_INTERFACE))
-        self.enigma2_indicator.quit(None)
 
     def update(self):
+        self.PropertiesChanged(PLAYER_INTERFACE, { "Metadata": self.get_metadata() }, [])
+
+    def get_metadata(self):
         try:
-            self.update_metadata()
-            self.PropertiesChanged(PLAYER_INTERFACE, { "Metadata": self.get_metadata() }, [])
-        except Exception as e:
-            self.logger.exception("Failed to update metadata")
+            if self.enigma_state.current_service and self.enigma_state.current_service_event:
+                service = self.enigma_state.current_service
+                current_service_event = self.enigma_state.current_service_event
+                # self.logger.debug("Get Metadata for %s" %(service["reference"]))
+                metadata = {
+                    "mpris:trackid": service["reference"],
+                    "mpris:length": 0,
+                    "xesam:title": " ",
+                    "xesam:artist": service["name"],
+                    "xesam:album": " ",
+                    "xesam:comment": " ",
+                    "mpris:artUrl": self.enigma_client.get_picon_url(service)
+                }
+                if current_service_event:
+                    if "id" in current_service_event and current_service_event["id"]:
+                        metadata["mpris:trackid"] = current_service_event["id"]
+                    if "title" in current_service_event and current_service_event["title"]:
+                        metadata["xesam:title"] = current_service_event["title"]
+                    if "description" in current_service_event and current_service_event["description"]:
+                        metadata["xesam:album"] = current_service_event["description"]
+                    elif "descriptionextended" in current_service_event and current_service_event["descriptionextended"]:
+                        metadata["xesam:album"] = current_service_event["descriptionextended"]
+                    if "descriptionextended" in current_service_event and current_service_event["descriptionextended"]:
+                        metadata["xesam:comment"] = current_service_event["descriptionextended"]
+                    if "duration" in current_service_event and current_service_event["duration"]:
+                        metadata["mpris:length"] = dbus.Int64(current_service_event["duration"] * 1000)
+                # self.logger.info(str(metadata))
+                return dbus.Dictionary(metadata, signature = "sv")
+            else:
+                return self.get_empty_dbus_dict()
+        except:
+            self.logger.exception("Failed to get metadata")
+            return self.get_empty_dbus_dict()
 
     def kill(self):
         self.ended = True
 
     def run(self):
-        time.sleep(1.0)
-        self.update()
         while not self.ended:
-            time.sleep(10.0)
+            time.sleep(1.0)
             self.update()

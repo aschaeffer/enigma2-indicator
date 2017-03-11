@@ -24,7 +24,9 @@ from dbus.mainloop.glib import DBusGMainLoop
 from e2indicator.gtkupdater import GtkUpdater
 from e2indicator.client import Enigma2Client
 from e2indicator.mpris import MprisServer
-from e2indicator.feedback import FeedbackWatcher
+from e2indicator.feedback import Enigma2FeedbackWatcher
+from e2indicator.state import Enigma2State
+from e2indicator.config import Enigma2Config
 
 APPINDICATOR_ID = "e2indicator"
 
@@ -34,20 +36,16 @@ INVISIBLE_ICON = "/usr/share/unity/icons/panel_shadow.png"
 class Enigma2Indicator():
 
     indicator = None
+    enigma_config = None
+    enigma_state = None
     enigma_client = None
     mpris_server = None
     notification = notify.Notification.new("")
     notifications_initialized = False
     initialized = False
     gtk_updater = None
-    config = {
-        "hostname": "daskaengurutv",
-        "showStationIcon": True,
-        "showStationName": True,
-        "showCurrentShowTitle": True
-    }
 
-    logger = logging.getLogger("e2indicator-indicator")
+    logger = logging.getLogger("e2-indicator")
 
     def __init__(self):
 
@@ -71,20 +69,21 @@ class Enigma2Indicator():
 
         signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-        self.enigma_client = Enigma2Client(self)
+        self.enigma_config = Enigma2Config()
+        self.enigma_state = Enigma2State()
+        self.enigma_client = Enigma2Client(self, self.enigma_config, self.enigma_state)
 
         self.update_label("Loading...")
         self.enigma_client.update_bouquets()
         self.indicator.set_menu(self.build_menu())
 
-        current_service = self.enigma_client.get_current_service_stream()
-        self.enigma_client.update_label(current_service)
+        self.enigma_client.update()
 
-        self.mpris_server = MprisServer(self, self.enigma_client)
-        self.mpris_server.start()
-
-        self.feedback_watcher = FeedbackWatcher(self, self.enigma_client, self.mpris_server)
+        self.feedback_watcher = Enigma2FeedbackWatcher(self.enigma_config, self.enigma_client)
         self.feedback_watcher.start()
+
+        self.mpris_server = MprisServer(self.enigma_client, self.enigma_state)
+        self.mpris_server.start()
 
         self.set_initialized(True)
 
@@ -136,17 +135,14 @@ class Enigma2Indicator():
     def stream(self, widget):
         self.enigma_client.stream(self.enigma_client.current_service)
 
-    def open_web_ui(self, widget):
-        webbrowser.open("http://%s/" %(self.config["hostname"]), 2)
-
     def create_menu_item(self, menu, name, cmd):
         item = gtk.MenuItem(name)
         item.connect("activate", self.command_service.send_command_w, cmd)
         menu.append(item)
 
     def set_config(self, widget, key):
-        self.config[key] = not self.config[key]
-        self.enigma_client.update_label(self.enigma_client.current_service)
+        self.enigma_config.config[key] = not self.enigma_config.config[key]
+        self.enigma_client.update_label(self.enigma_state.current_service)
 
     def build_menu(self):
         menu = gtk.Menu()
@@ -154,7 +150,7 @@ class Enigma2Indicator():
         menu_tv = gtk.Menu()
         item_tv = gtk.MenuItem("TV")
         item_tv.set_submenu(menu_tv)
-        for service in self.enigma_client.bouquets["tv"]:
+        for service in self.enigma_state.bouquets["tv"]:
             menu_bouquet = gtk.Menu()
             item_bouquet = gtk.MenuItem(service["name"])
             item_bouquet.set_submenu(menu_bouquet)
@@ -168,7 +164,7 @@ class Enigma2Indicator():
         menu_radio = gtk.Menu()
         item_radio = gtk.MenuItem("Radio")
         item_radio.set_submenu(menu_radio)
-        for service in self.enigma_client.bouquets["radio"]:
+        for service in self.enigma_state.bouquets["radio"]:
             menu_bouquet = gtk.Menu()
             item_bouquet = gtk.MenuItem(service["name"])
             item_bouquet.set_submenu(menu_bouquet)
@@ -187,22 +183,22 @@ class Enigma2Indicator():
         self.indicator.set_secondary_activate_target(item_stream)
 
         item_webinterface = gtk.MenuItem("Web Interface")
-        item_webinterface.connect("activate", self.open_web_ui)
+        item_webinterface.connect("activate", self.enigma_client.open_web_ui)
         menu.append(item_webinterface)
 
         menu_config = gtk.Menu()
         item_config = gtk.MenuItem("Config")
         item_config.set_submenu(menu_config)
         item_show_station_icon = gtk.CheckMenuItem.new_with_label("Show Station Logo")
-        item_show_station_icon.set_active(self.config["showStationIcon"])
+        item_show_station_icon.set_active(self.enigma_config.config["showStationIcon"])
         item_show_station_icon.connect("toggled", self.set_config, "showStationIcon")
         menu_config.append(item_show_station_icon)
         item_show_station_name = gtk.CheckMenuItem.new_with_label("Show Station Name")
-        item_show_station_name.set_active(self.config["showStationName"])
+        item_show_station_name.set_active(self.enigma_config.config["showStationName"])
         item_show_station_name.connect("toggled", self.set_config, "showStationName")
         menu_config.append(item_show_station_name)
         item_show_current_show_title = gtk.CheckMenuItem.new_with_label("Show Current Show Title")
-        item_show_current_show_title.set_active(self.config["showCurrentShowTitle"])
+        item_show_current_show_title.set_active(self.enigma_config.config["showCurrentShowTitle"])
         item_show_current_show_title.connect("toggled", self.set_config, "showCurrentShowTitle")
         menu_config.append(item_show_current_show_title)
         menu.append(item_config)

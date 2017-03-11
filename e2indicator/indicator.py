@@ -27,6 +27,7 @@ from e2indicator.mpris import Enigma2MprisServer
 from e2indicator.feedback import Enigma2FeedbackWatcher
 from e2indicator.state import Enigma2State
 from e2indicator.config import Enigma2Config
+from e2indicator.device import Enigma2DeviceService
 
 APPINDICATOR_ID = "e2indicator"
 
@@ -70,6 +71,13 @@ class Enigma2Indicator():
         signal.signal(signal.SIGINT, signal.SIG_DFL)
 
         self.enigma_config = Enigma2Config()
+        
+        self.enigma_device = Enigma2DeviceService()
+        if not self.enigma_device.is_enigma(self.enigma_config["hostname"]):
+            if self.enigma_device.find_device():
+                self.enigma_config["hostname"] = self.enigma_device.ip
+                self.enigma_config["model"] = self.enigma_device.model
+        
         self.enigma_state = Enigma2State()
         self.enigma_client = Enigma2Client(self, self.enigma_config, self.enigma_state)
 

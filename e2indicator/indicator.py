@@ -81,7 +81,7 @@ class Enigma2Indicator():
 
         self.update_label("%s: Loading Bouquets..." %(self.enigma_config["model"]))
 
-        self.enigma_client.update_bouquets()
+        self.enigma_client.get_bouquets()
         self.indicator.set_menu(self.build_menu())
 
         self.enigma_client.update()
@@ -140,7 +140,7 @@ class Enigma2Indicator():
             self.enigma_client.channel_up()
 
     def stream(self, widget):
-        self.enigma_client.stream(self.enigma_client.current_service)
+        self.enigma_client.stream(self.enigma_state.current_service)
 
     def create_menu_item(self, menu, name, cmd):
         item = gtk.MenuItem(name)
@@ -150,6 +150,10 @@ class Enigma2Indicator():
     def set_config(self, widget, key):
         self.enigma_config[key] = not self.enigma_config[key]
         self.enigma_client.update_label(self.enigma_state.current_service)
+
+    def reload_bouquets(self, widget, data):
+        self.enigma_client.get_bouquets(True)
+        self.indicator.set_menu(self.build_menu())
 
     def build_menu(self):
         menu = gtk.Menu()
@@ -162,7 +166,7 @@ class Enigma2Indicator():
             item_bouquet = gtk.MenuItem(service["name"])
             item_bouquet.set_submenu(menu_bouquet)
             menu_tv.append(item_bouquet)
-            for sub_service in self.enigma_client.get_services_2(service):
+            for sub_service in service["services"]:
                 item_service = gtk.MenuItem(sub_service["name"])
                 item_service.connect("activate", self.enigma_client.select_channel, sub_service)
                 menu_bouquet.append(item_service)
@@ -176,7 +180,7 @@ class Enigma2Indicator():
             item_bouquet = gtk.MenuItem(service["name"])
             item_bouquet.set_submenu(menu_bouquet)
             menu_radio.append(item_bouquet)
-            for sub_service in self.enigma_client.get_services_2(service):
+            for sub_service in service["services"]:
                 item_service = gtk.MenuItem(sub_service["name"])
                 item_service.connect("activate", self.enigma_client.select_channel, sub_service)
                 menu_bouquet.append(item_service)
@@ -233,8 +237,14 @@ class Enigma2Indicator():
         menu.append(item_power)
 
         menu.append(gtk.SeparatorMenuItem())
+        item_reload_bouquets = gtk.MenuItem("Reload Bouquets")
+        item_reload_bouquets.connect("activate", self.reload_bouquets, None)
+        menu.append(item_reload_bouquets)
+
+        menu.append(gtk.SeparatorMenuItem())
 
         item_model = gtk.MenuItem(self.enigma_config["model"])
+        item_model.connect("activate", self.enigma_state.save_bouquets, None)
         menu.append(item_model)
 
         menu.append(gtk.SeparatorMenuItem())

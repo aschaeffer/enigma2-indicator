@@ -30,10 +30,6 @@ class Enigma2Client():
         except:
             pass
 
-    def update_bouquets(self):
-        self.get_bouquets_tv()
-        self.get_bouquets_radio()
-        
     def get_model(self):
         response = requests.get("http://%s/web/about" %(self.enigma_config["hostname"]))
         tree = ElementTree.fromstring(response.content)
@@ -77,6 +73,13 @@ class Enigma2Client():
             "type": "normal"
         }
 
+    def get_bouquets(self, force = False):
+        if force or not self.enigma_state.load_bouquets():
+            self.enigma_state.reset_bouquets()
+            self.get_bouquets_tv()
+            self.get_bouquets_radio()
+            self.enigma_state.save_bouquets()
+        
     def get_bouquets_tv(self):
         response = requests.get("http://%s/web/getservices" %(self.enigma_config["hostname"]))
         tree = ElementTree.fromstring(response.content)
@@ -94,6 +97,7 @@ class Enigma2Client():
                     if service_attr.tag == "e2servicename":
                         service["name"] = service_attr.text
                 if type == "tv":
+                    service["services"] = self.get_services_2(service)
                     self.enigma_state.bouquets["tv"].append(service)
 
     def get_bouquets_radio(self):
@@ -111,6 +115,7 @@ class Enigma2Client():
                     if service_attr.tag == "e2servicename":
                         service["name"] = service_attr.text
                 if type == "radio":
+                    service["services"] = self.get_services_2(service)
                     self.enigma_state.bouquets["radio"].append(service)
 
     def get_services(self, bouquet):
@@ -128,7 +133,7 @@ class Enigma2Client():
                 self.enigma_state.services.append(service)
         return self.enigma_state.services
 
-    def get_services_2(self, service):
+    def get_services_2(self, service, recursive = 0):
         self.enigma_state.services = []
         response = requests.get("http://%s/web/getservices?sRef=%s" %(self.enigma_config["hostname"], quote(service["reference"])))
         tree = ElementTree.fromstring(response.content)
@@ -140,6 +145,8 @@ class Enigma2Client():
                         service["reference"] = service_attr.text
                     if service_attr.tag == "e2servicename":
                         service["name"] = service_attr.text
+                if recursive > 0:
+                    service["services"] = self.get_services_2(service, recursive -1)
                 self.enigma_state.services.append(service)
         return self.enigma_state.services
 

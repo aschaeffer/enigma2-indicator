@@ -16,6 +16,7 @@ class Enigma2State():
         "tv": [],
         "radio": []
     }
+    history = []
 
     logger = logging.getLogger("e2-state")
 

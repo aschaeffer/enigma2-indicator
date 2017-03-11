@@ -231,9 +231,21 @@ class Enigma2Client():
         return None
 
     def update(self):
+        last_service = self.enigma_state.current_service
         self.enigma_state.current_service = self.get_current_service_stream()
         self.get_epg(self.enigma_state.current_service)
         self.update_label(self.enigma_state.current_service)
+        if not last_service or self.enigma_state.current_service["reference"] != last_service["reference"]:
+            self.insert_history(self.enigma_state.current_service)
+
+    def insert_history(self, service):
+        history = []
+        for _service in self.enigma_state.history:
+            if _service["reference"] != service["reference"]:
+                history.append(_service)
+        history.insert(0, service)
+        self.enigma_state.history = history
+        self.enigma_indicator.rebuild_menu()
 
     def update_label(self, service):
         if service:

@@ -45,6 +45,7 @@ class Enigma2Indicator():
     notifications_initialized = False
     initialized = False
     gtk_updater = None
+    menu = None
 
     logger = logging.getLogger("e2-indicator")
 
@@ -82,7 +83,7 @@ class Enigma2Indicator():
         self.update_label("%s: Loading Bouquets..." %(self.enigma_config["model"]))
 
         self.enigma_client.get_bouquets()
-        self.indicator.set_menu(self.build_menu())
+        # self.rebuild_menu()
 
         self.enigma_client.update()
 
@@ -153,10 +154,13 @@ class Enigma2Indicator():
 
     def reload_bouquets(self, widget, data):
         self.enigma_client.get_bouquets(True)
+        self.rebuild_menu()
+
+    def rebuild_menu(self):
         self.indicator.set_menu(self.build_menu())
 
     def build_menu(self):
-        menu = gtk.Menu()
+        self.menu = gtk.Menu()
 
         menu_tv = gtk.Menu()
         item_tv = gtk.MenuItem("TV")
@@ -170,7 +174,7 @@ class Enigma2Indicator():
                 item_service = gtk.MenuItem(sub_service["name"])
                 item_service.connect("activate", self.enigma_client.select_channel, sub_service)
                 menu_bouquet.append(item_service)
-        menu.append(item_tv)
+        self.menu.append(item_tv)
 
         menu_radio = gtk.Menu()
         item_radio = gtk.MenuItem("Radio")
@@ -184,18 +188,18 @@ class Enigma2Indicator():
                 item_service = gtk.MenuItem(sub_service["name"])
                 item_service.connect("activate", self.enigma_client.select_channel, sub_service)
                 menu_bouquet.append(item_service)
-        menu.append(item_radio)
+        self.menu.append(item_radio)
 
-        menu.append(gtk.SeparatorMenuItem())
+        self.menu.append(gtk.SeparatorMenuItem())
 
         item_stream = gtk.MenuItem("Stream Current Station")
         item_stream.connect("activate", self.stream)
-        menu.append(item_stream)
+        self.menu.append(item_stream)
         self.indicator.set_secondary_activate_target(item_stream)
 
         item_webinterface = gtk.MenuItem("Web Interface")
         item_webinterface.connect("activate", self.enigma_client.open_web_ui)
-        menu.append(item_webinterface)
+        self.menu.append(item_webinterface)
 
         menu_config = gtk.Menu()
         item_config = gtk.MenuItem("Config")
@@ -212,9 +216,9 @@ class Enigma2Indicator():
         item_show_current_show_title.set_active(self.enigma_config["showCurrentShowTitle"])
         item_show_current_show_title.connect("toggled", self.set_config, "showCurrentShowTitle")
         menu_config.append(item_show_current_show_title)
-        menu.append(item_config)
+        self.menu.append(item_config)
 
-        menu.append(gtk.SeparatorMenuItem())
+        self.menu.append(gtk.SeparatorMenuItem())
 
         menu_power = gtk.Menu()
         item_power = gtk.MenuItem("Power")
@@ -234,29 +238,42 @@ class Enigma2Indicator():
         item_power_wake_up = gtk.MenuItem("Wake Up")
         item_power_wake_up.connect("activate", self.enigma_client.power_wake_up)
         menu_power.append(item_power_wake_up)
-        menu.append(item_power)
+        self.menu.append(item_power)
 
-        menu.append(gtk.SeparatorMenuItem())
+        self.menu.append(gtk.SeparatorMenuItem())
+
         item_reload_bouquets = gtk.MenuItem("Reload Bouquets")
         item_reload_bouquets.connect("activate", self.reload_bouquets, None)
-        menu.append(item_reload_bouquets)
+        self.menu.append(item_reload_bouquets)
 
-        menu.append(gtk.SeparatorMenuItem())
+        self.menu.append(gtk.SeparatorMenuItem())
+
+        for service in self.enigma_state.history:
+            item_history_item = gtk.ImageMenuItem(service["name"])
+            image_path = self.enigma_client.get_picon(service)
+            image = gtk.Image()
+            image.set_from_file(image_path)
+            item_history_item.set_image(image)
+            item_history_item.set_always_show_image(True)
+            item_history_item.connect("activate", self.enigma_client.select_channel, service)
+            self.menu.append(item_history_item)
+
+        self.menu.append(gtk.SeparatorMenuItem())
 
         item_model = gtk.MenuItem(self.enigma_config["model"])
         item_model.connect("activate", self.enigma_state.save_bouquets, None)
-        menu.append(item_model)
+        self.menu.append(item_model)
 
-        menu.append(gtk.SeparatorMenuItem())
+        self.menu.append(gtk.SeparatorMenuItem())
 
         item_quit = gtk.MenuItem("Quit")
         item_quit.connect("activate", self.quit)
-        menu.append(item_quit)
+        self.menu.append(item_quit)
 
-        menu.append(gtk.SeparatorMenuItem())
+        self.menu.append(gtk.SeparatorMenuItem())
 
-        menu.show_all()
-        return menu
+        self.menu.show_all()
+        return self.menu
 
     def main(self):
         gtk.main()

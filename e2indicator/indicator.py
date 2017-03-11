@@ -23,7 +23,7 @@ from dbus.mainloop.glib import DBusGMainLoop
 
 from e2indicator.gtkupdater import GtkUpdater
 from e2indicator.client import Enigma2Client
-from e2indicator.mpris import MprisServer
+from e2indicator.mpris import Enigma2MprisServer
 from e2indicator.feedback import Enigma2FeedbackWatcher
 from e2indicator.state import Enigma2State
 from e2indicator.config import Enigma2Config
@@ -39,7 +39,7 @@ class Enigma2Indicator():
     enigma_config = None
     enigma_state = None
     enigma_client = None
-    mpris_server = None
+    enigma_mpris_server = None
     notification = notify.Notification.new("")
     notifications_initialized = False
     initialized = False
@@ -82,8 +82,8 @@ class Enigma2Indicator():
         self.feedback_watcher = Enigma2FeedbackWatcher(self.enigma_config, self.enigma_client)
         self.feedback_watcher.start()
 
-        self.mpris_server = MprisServer(self.enigma_client, self.enigma_state)
-        self.mpris_server.start()
+        self.enigma_mpris_server = Enigma2MprisServer(self.enigma_client, self.enigma_state)
+        self.enigma_mpris_server.start()
 
         self.set_initialized(True)
 
@@ -95,9 +95,9 @@ class Enigma2Indicator():
         if self.feedback_watcher != None:
             self.feedback_watcher.kill()
             self.feedback_watcher.join(8)
-        if self.mpris_server != None:
-            self.mpris_server.kill()
-            self.mpris_server.join(8)
+        if self.enigma_mpris_server != None:
+            self.enigma_mpris_server.kill()
+            self.enigma_mpris_server.join(8)
         gtk.main_quit()
 
     def set_initialized(self, initialized):
@@ -141,7 +141,7 @@ class Enigma2Indicator():
         menu.append(item)
 
     def set_config(self, widget, key):
-        self.enigma_config.config[key] = not self.enigma_config.config[key]
+        self.enigma_config[key] = not self.enigma_config[key]
         self.enigma_client.update_label(self.enigma_state.current_service)
 
     def build_menu(self):
@@ -190,15 +190,15 @@ class Enigma2Indicator():
         item_config = gtk.MenuItem("Config")
         item_config.set_submenu(menu_config)
         item_show_station_icon = gtk.CheckMenuItem.new_with_label("Show Station Logo")
-        item_show_station_icon.set_active(self.enigma_config.config["showStationIcon"])
+        item_show_station_icon.set_active(self.enigma_config["showStationIcon"])
         item_show_station_icon.connect("toggled", self.set_config, "showStationIcon")
         menu_config.append(item_show_station_icon)
         item_show_station_name = gtk.CheckMenuItem.new_with_label("Show Station Name")
-        item_show_station_name.set_active(self.enigma_config.config["showStationName"])
+        item_show_station_name.set_active(self.enigma_config["showStationName"])
         item_show_station_name.connect("toggled", self.set_config, "showStationName")
         menu_config.append(item_show_station_name)
         item_show_current_show_title = gtk.CheckMenuItem.new_with_label("Show Current Show Title")
-        item_show_current_show_title.set_active(self.enigma_config.config["showCurrentShowTitle"])
+        item_show_current_show_title.set_active(self.enigma_config["showCurrentShowTitle"])
         item_show_current_show_title.connect("toggled", self.set_config, "showCurrentShowTitle")
         menu_config.append(item_show_current_show_title)
         menu.append(item_config)

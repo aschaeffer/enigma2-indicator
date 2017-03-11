@@ -35,7 +35,7 @@ class Enigma2Client():
         self.get_bouquets_radio()
         
     def get_model(self):
-        response = requests.get("http://%s/web/about" %(self.enigma_config.config["hostname"]))
+        response = requests.get("http://%s/web/about" %(self.enigma_config["hostname"]))
         tree = ElementTree.fromstring(response.content)
         for child in tree[0]:
             if child.tag == "e2model":
@@ -45,7 +45,7 @@ class Enigma2Client():
     def get_current_service_stream(self):
         self.enigma_state.current_service = self.get_empty_service()
         try:
-            response = requests.get("http://%s/web/streamsubservices" %(self.enigma_config.config["hostname"]))
+            response = requests.get("http://%s/web/streamsubservices" %(self.enigma_config["hostname"]))
             tree = ElementTree.fromstring(response.content)
             for service_tag in tree:
                 if service_tag.tag == "e2service":
@@ -78,7 +78,7 @@ class Enigma2Client():
         }
 
     def get_bouquets_tv(self):
-        response = requests.get("http://%s/web/getservices" %(self.enigma_config.config["hostname"]))
+        response = requests.get("http://%s/web/getservices" %(self.enigma_config["hostname"]))
         tree = ElementTree.fromstring(response.content)
         for service_tag in tree:
             if service_tag.tag == "e2service":
@@ -97,7 +97,7 @@ class Enigma2Client():
                     self.enigma_state.bouquets["tv"].append(service)
 
     def get_bouquets_radio(self):
-        response = requests.get("http://%s/web/getservices?sRef=1:7:2:0:0:0:0:0:0:0:type == 2 FROM BOUQUET \"bouquets.radio\"" %(self.enigma_config.config["hostname"]))
+        response = requests.get("http://%s/web/getservices?sRef=1:7:2:0:0:0:0:0:0:0:type == 2 FROM BOUQUET \"bouquets.radio\"" %(self.enigma_config["hostname"]))
         tree = ElementTree.fromstring(response.content)
         for service_tag in tree:
             if service_tag.tag == "e2service":
@@ -115,7 +115,7 @@ class Enigma2Client():
 
     def get_services(self, bouquet):
         self.enigma_state.services = []
-        response = requests.get("http://%s/web/getservices?sRef=1:7:1:0:0:0:0:0:0:0:FROM%%20BOUQUET%%20%%22%s%%22%%20ORDER%%20BY%%20bouquet" %(self.enigma_config.config["hostname"], bouquet))
+        response = requests.get("http://%s/web/getservices?sRef=1:7:1:0:0:0:0:0:0:0:FROM%%20BOUQUET%%20%%22%s%%22%%20ORDER%%20BY%%20bouquet" %(self.enigma_config["hostname"], bouquet))
         tree = ElementTree.fromstring(response.content)
         for service_tag in tree:
             if service_tag.tag == "e2service":
@@ -130,7 +130,7 @@ class Enigma2Client():
 
     def get_services_2(self, service):
         self.enigma_state.services = []
-        response = requests.get("http://%s/web/getservices?sRef=%s" %(self.enigma_config.config["hostname"], quote(service["reference"])))
+        response = requests.get("http://%s/web/getservices?sRef=%s" %(self.enigma_config["hostname"], quote(service["reference"])))
         tree = ElementTree.fromstring(response.content)
         for service_tag in tree:
             if service_tag.tag == "e2service":
@@ -159,7 +159,7 @@ class Enigma2Client():
             else:
                 try:
                     self.logger.info("Getting EPG for %s" %(service["reference"]))
-                    response = requests.get("http://%s/web/epgservice?sRef=%s" %(self.enigma_config.config["hostname"], quote(service["reference"])))
+                    response = requests.get("http://%s/web/epgservice?sRef=%s" %(self.enigma_config["hostname"], quote(service["reference"])))
                     tree = ElementTree.fromstring(response.content)
                     service["events"] = []
                     for e2event_tag in tree:
@@ -230,22 +230,22 @@ class Enigma2Client():
 
     def update_label(self, service):
         if service:
-            if self.enigma_config.config["showCurrentShowTitle"]:
+            if self.enigma_config["showCurrentShowTitle"]:
                 current_service_event = self.get_current_service_event(service)
                 if current_service_event != None:
-                    if self.enigma_config.config["showStationName"]:
+                    if self.enigma_config["showStationName"]:
                         self.enigma_indicator.update_label("%s: %s" %(service["name"], current_service_event["title"]))
                     else:
                         self.enigma_indicator.update_label("%s" %(current_service_event["title"]))
-                elif self.enigma_config.config["showStationName"]:
+                elif self.enigma_config["showStationName"]:
                     self.enigma_indicator.update_label(service["name"])
-            elif self.enigma_config.config["showStationName"]:
+            elif self.enigma_config["showStationName"]:
                 self.enigma_indicator.update_label(service["name"])
             else:
                 self.enigma_indicator.update_label("")
-            if self.enigma_config.config["showStationIcon"]:
+            if self.enigma_config["showStationIcon"]:
                 self.enigma_indicator.update_icon(service)
-            elif self.enigma_config.config["showStationName"] or self.enigma_config.config["showCurrentShowTitle"]:
+            elif self.enigma_config["showStationName"] or self.enigma_config["showCurrentShowTitle"]:
                 # Showing the station name or current show title => No icon
                 self.enigma_indicator.remove_icon()
             else:
@@ -261,7 +261,7 @@ class Enigma2Client():
                 self.logger.info("Open stream %s" %(service["streamurl"]))
                 webbrowser.open(service["streamurl"])
             elif "reference" in service:
-                stream_url = "http://%s/web/stream.m3u?ref=%s" %(self.enigma_config.config["hostname"], quote(service["reference"]))
+                stream_url = "http://%s/web/stream.m3u?ref=%s" %(self.enigma_config["hostname"], quote(service["reference"]))
                 self.logger.info("Open stream %s" %(stream_url))
                 webbrowser.open(stream_url)
             else:
@@ -272,7 +272,7 @@ class Enigma2Client():
     def select_channel(self, widget, service):
         try:
             self.logger.info("Select channel %s" %(service["reference"]))
-            response = requests.get("http://%s/web/zap?sRef=%s" %(self.enigma_config.config["hostname"], quote(service["reference"])))
+            response = requests.get("http://%s/web/zap?sRef=%s" %(self.enigma_config["hostname"], quote(service["reference"])))
             self.current_service = service
             self.update_label(service)
         except:
@@ -281,7 +281,7 @@ class Enigma2Client():
     def channel_up(self):
         try:
             self.logger.info("Channel up")
-            response = requests.get("http://%s/web/remotecontrol?command=403" %(self.enigma_config.config["hostname"]))
+            response = requests.get("http://%s/web/remotecontrol?command=403" %(self.enigma_config["hostname"]))
             self.update()
         except:
             self.logger.error("Failed to select next channel")
@@ -289,7 +289,7 @@ class Enigma2Client():
     def channel_down(self):
         try:
             self.logger.info("Channel down")
-            response = requests.get("http://%s/web/remotecontrol?command=402" %(self.enigma_config.config["hostname"]))
+            response = requests.get("http://%s/web/remotecontrol?command=402" %(self.enigma_config["hostname"]))
             self.update()
         except:
             self.logger.error("Failed to select previous channel")
@@ -297,7 +297,7 @@ class Enigma2Client():
     def set_power_state(self, state):
         try:
             self.logger.info("Setting power state %d" %(state))
-            response = requests.get("http://%s/web/powerstate?newstate=%d" %(self.enigma_config.config["hostname"], state))
+            response = requests.get("http://%s/web/powerstate?newstate=%d" %(self.enigma_config["hostname"], state))
             self.update()
         except:
             self.logger.error("Failed to set power state")
@@ -318,15 +318,15 @@ class Enigma2Client():
         self.set_power_state(116)
 
     def open_web_ui(self, widget = None):
-        webbrowser.open("http://%s/" %(self.enigma_config.config["hostname"]), 2)
+        webbrowser.open("http://%s/" %(self.enigma_config["hostname"]), 2)
 
     def get_picon(self, service):
         try:
             filename = "%s.png" %(service["reference"][:-1].replace(":", "_"))
-            url = "http://%s/picon/%s" %(self.enigma_config.config["hostname"], filename)
+            url = "http://%s/picon/%s" %(self.enigma_config["hostname"], filename)
             local_path = "/tmp/%s" %(filename)
             filename2 = "%s.png" %(service["name"].lower().replace(" ", ""))
-            url2 = "http://%s/picon/%s" %(self.enigma_config.config["hostname"], filename2)
+            url2 = "http://%s/picon/%s" %(self.enigma_config["hostname"], filename2)
             local_path2 = "/tmp/%s" %(filename2)
             if not os.path.exists(local_path):
                 if not os.path.exists(local_path2):
@@ -338,7 +338,7 @@ class Enigma2Client():
                             f.close()
                             return local_path
                         else:
-                            r = requests.get(url)
+                            r = requests.get(url2)
                             if r.status_code == 200:
                                 f = open(local_path, "wb")
                                 f.write(r.content)

@@ -18,7 +18,7 @@ ROOT_INTERFACE = "org.mpris.MediaPlayer2"
 PLAYER_INTERFACE = "org.mpris.MediaPlayer2.Player"
 PROPERTIES_INTERFACE = "org.freedesktop.DBus.Properties"
 
-class MprisServer(threading.Thread, dbus.service.Object):
+class Enigma2MprisServer(threading.Thread, dbus.service.Object):
 
     enigma_client = None
     enigma_state = None
@@ -26,7 +26,7 @@ class MprisServer(threading.Thread, dbus.service.Object):
     bus = None
     ended = False
 
-    logger = logging.getLogger("e2indicator-mpris")
+    logger = logging.getLogger("e2-mpris")
 
     def __init__(self, enigma_client, enigma_state):
         threading.Thread.__init__(self)

@@ -202,9 +202,9 @@ class Enigma2Client():
                                     service_event["service"] = e2event_attr.text
                                 if e2event_attr.tag == "e2eventtitle":
                                     service_event["title"] = e2event_attr.text
-                                if e2event_attr.tag == "e2eventdescription":
+                                if e2event_attr.tag == "e2eventdescription" and e2event_attr.text:
                                     service_event["description"] = e2event_attr.text
-                                if e2event_attr.tag == "e2eventdescriptionextended":
+                                if e2event_attr.tag == "e2eventdescriptionextended" and e2event_attr.text:
                                     service_event["descriptionextended"] = e2event_attr.text
                                 if e2event_attr.tag == "e2eventstart":
                                     service_event["start"] = int(e2event_attr.text)

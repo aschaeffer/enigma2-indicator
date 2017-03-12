@@ -279,7 +279,7 @@ class Enigma2Indicator():
         if self.enigma_config["showHistory"]:
             for (service, service_event) in self.enigma_state.history:
                 if service_event and service_event["title"].strip() != "":
-                    if service_event["description"].strip() != "":
+                    if "description" in service_event and service_event["description"].strip() != "":
                         menu_title = "%s\n%s\n%s" %(service["name"], service_event["title"], service_event["description"])
                     else:
                         menu_title = "%s\n%s" %(service["name"], service_event["title"])

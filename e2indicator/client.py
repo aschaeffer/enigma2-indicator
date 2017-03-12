@@ -4,8 +4,10 @@
 import logging
 import os
 import requests
+import subprocess
 import time
 import webbrowser
+from appdirs import *
 from xml.etree import ElementTree
 from urllib.parse import quote
 try:
@@ -150,6 +152,23 @@ class Enigma2Client():
                 self.enigma_state.services.append(service)
         return self.enigma_state.services
 
+    def fetch_services(self, service, recursive = 0):
+        services = []
+        response = requests.get("http://%s/web/getservices?sRef=%s" %(self.enigma_config["hostname"], quote(service["reference"])))
+        tree = ElementTree.fromstring(response.content)
+        for service_tag in tree:
+            if service_tag.tag == "e2service":
+                service = {}
+                for service_attr in service_tag:
+                    if service_attr.tag == "e2servicereference":
+                        service["reference"] = service_attr.text
+                    if service_attr.tag == "e2servicename":
+                        service["name"] = service_attr.text
+                if recursive > 0:
+                    service["services"] = fetch_services(service, recursive -1)
+                services.append(service)
+        return services
+
     def get_epg(self, service):
         try:
             if "type" in service and service["type"] == "stream":
@@ -254,8 +273,10 @@ class Enigma2Client():
                 if current_service_event != None:
                     if self.enigma_config["showStationName"]:
                         self.enigma_indicator.update_label("%s: %s" %(service["name"], current_service_event["title"]))
+                    elif current_service_event["title"].strip() == "" and self.enigma_config["currentShowTitleFallback"]:
+                        self.enigma_indicator.update_label(service["name"])
                     else:
-                        self.enigma_indicator.update_label("%s" %(current_service_event["title"]))
+                        self.enigma_indicator.update_label(current_service_event["title"])
                 elif self.enigma_config["showStationName"]:
                     self.enigma_indicator.update_label(service["name"])
             elif self.enigma_config["showStationName"]:
@@ -283,6 +304,34 @@ class Enigma2Client():
                 stream_url = "http://%s/web/stream.m3u?ref=%s" %(self.enigma_config["hostname"], quote(service["reference"]))
                 self.logger.info("Open stream %s" %(stream_url))
                 webbrowser.open(stream_url)
+            else:
+                self.logger.error("Missing service reference or stream url!")
+        else:
+            self.logger.error("No service!")
+
+    def get_stream_url(self, service, quoted = True):
+        if service:
+            if "FROM BOUQUET" in service["reference"]:
+                services = self.fetch_services(service)
+                self.logger.info(str(services))
+                self.logger.info(str(self.get_stream_url(services[0], quoted)))
+                return self.get_stream_url(services[0], quoted)
+            elif service["reference"].split(":")[0] == "4097":
+                service["type"] = "stream"
+                service["streamurl"] = service["reference"].split(":")[10].replace("%3a", ":")
+                if service["reference"].split(":")[2] == "0":
+                    service["streamtype"] = "tv"
+                elif service["reference"].split(":")[2] == "2":
+                    service["streamtype"] = "radio"
+                else:
+                    service["streamtype"] = "stream"
+            if "type" in service and service["type"] == "stream":
+                return service["streamurl"]
+            elif "reference" in service:
+                if quoted:
+                    return "http://%s:8001/%s" %(self.enigma_config["hostname"], quote(service["reference"]))
+                else:
+                    return "http://%s:8001/%s" %(self.enigma_config["hostname"], service["reference"])
             else:
                 self.logger.error("Missing service reference or stream url!")
         else:
@@ -338,6 +387,17 @@ class Enigma2Client():
 
     def open_web_ui(self, widget = None):
         webbrowser.open("http://%s/" %(self.enigma_config["hostname"]), 2)
+
+    def save_bouquet_as_pls(self, widget = None, service = None):
+        path = os.path.join(user_data_dir("e2indicator"), "%s.m3u" %(service["name"]))
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+        with open(path, "w") as f:
+            f.write("#EXTM3U\n#EXTVLCOPT--http-reconnect=true\n")
+            for _service in service["services"]:
+                f.write("#EXTINF:-1,%s\n%s\n" %(_service["name"], self.get_stream_url(_service, False)))
+        # webbrowser.open_new_tab("file://%s"%(path))
+        # subprocess.call(["xdg-open", path])
 
     def get_picon(self, service):
         try:

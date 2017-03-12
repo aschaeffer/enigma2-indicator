@@ -83,9 +83,6 @@ class Enigma2Indicator():
         self.update_label("%s: Loading Bouquets..." %(self.enigma_config["model"]))
 
         self.enigma_client.get_bouquets()
-        # self.rebuild_menu()
-
-        self.enigma_client.update()
 
         self.feedback_watcher = Enigma2FeedbackWatcher(self.enigma_config, self.enigma_client)
         self.feedback_watcher.start()
@@ -174,6 +171,10 @@ class Enigma2Indicator():
                 item_service = gtk.MenuItem(sub_service["name"])
                 item_service.connect("activate", self.enigma_client.select_channel, sub_service)
                 menu_bouquet.append(item_service)
+            menu_bouquet.append(gtk.SeparatorMenuItem())
+            item_m3u = gtk.MenuItem("Save %s.m3u"%(service["name"]))
+            item_m3u.connect("activate", self.enigma_client.save_bouquet_as_pls, service)
+            menu_bouquet.append(item_m3u)
         self.menu.append(item_tv)
 
         menu_radio = gtk.Menu()
@@ -188,6 +189,10 @@ class Enigma2Indicator():
                 item_service = gtk.MenuItem(sub_service["name"])
                 item_service.connect("activate", self.enigma_client.select_channel, sub_service)
                 menu_bouquet.append(item_service)
+            menu_bouquet.append(gtk.SeparatorMenuItem())
+            item_m3u = gtk.MenuItem("Save %s.m3u"%(service["name"]))
+            item_m3u.connect("activate", self.enigma_client.save_bouquet_as_pls, service)
+            menu_bouquet.append(item_m3u)
         self.menu.append(item_radio)
 
         self.menu.append(gtk.SeparatorMenuItem())
@@ -216,6 +221,10 @@ class Enigma2Indicator():
         item_show_current_show_title.set_active(self.enigma_config["showCurrentShowTitle"])
         item_show_current_show_title.connect("toggled", self.set_config, "showCurrentShowTitle")
         menu_config.append(item_show_current_show_title)
+        item_current_show_title_fallback = gtk.CheckMenuItem.new_with_label("Current Show Title Fallback")
+        item_current_show_title_fallback.set_active(self.enigma_config["currentShowTitleFallback"])
+        item_current_show_title_fallback.connect("toggled", self.set_config, "currentShowTitleFallback")
+        menu_config.append(item_current_show_title_fallback)
         self.menu.append(item_config)
 
         self.menu.append(gtk.SeparatorMenuItem())

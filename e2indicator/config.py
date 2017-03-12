@@ -43,6 +43,8 @@ class Enigma2Config(dict):
                 self["showStationName"] = True
             if "showCurrentShowTitle" not in self:
                 self["showCurrentShowTitle"] = True
+            if "currentShowTitleFallback" not in self:
+                self["currentShowTitleFallback"] = True
             if "updateDelay" not in self:
                 self["updateDelay"] = 5.0
         except:
@@ -52,6 +54,7 @@ class Enigma2Config(dict):
             self["showStationIcon"] = True
             self["showStationName"] = True
             self["showCurrentShowTitle"] = True
+            self["currentShowTitleFallback"] = True
             self["updateDelay"] = 5.0
 
     def save(self):

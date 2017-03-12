@@ -47,6 +47,12 @@ class Enigma2Config(dict):
                 self["currentShowTitleFallback"] = True
             if "updateDelay" not in self:
                 self["updateDelay"] = 5.0
+            if "showHistory" not in self:
+                self["showHistory"] = True
+            if "maxHistoryEntries" not in self:
+                self["maxHistoryEntries"] = 5
+            if "showExtras" not in self:
+                self["showExtras"] = False
         except:
             self.logger.exception("Couldn't load config, using defaults")
             self["hostname"] = "localhost"
@@ -56,6 +62,9 @@ class Enigma2Config(dict):
             self["showCurrentShowTitle"] = True
             self["currentShowTitleFallback"] = True
             self["updateDelay"] = 5.0
+            self["showHistory"] = True
+            self["maxHistoryEntries"] = 5
+            self["showExtras"] = True
 
     def save(self):
         path = os.path.join(user_config_dir("e2indicator"), "config.toml")

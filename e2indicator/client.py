@@ -7,6 +7,7 @@ import requests
 import subprocess
 import time
 import webbrowser
+import hashlib
 from appdirs import *
 from xml.etree import ElementTree
 from urllib.parse import quote
@@ -177,6 +178,7 @@ class Enigma2Client():
                     try:
                         stationinfo = self.streamscrobbler.getServerInfo(service["streamurl"])
                         metadata = stationinfo.get("metadata")
+                        service_event["id"] = int(hashlib.sha1(metadata["song"].encode('utf-8')).hexdigest(), 16) % (10 ** 8)
                         service_event["title"] = metadata["song"]
                     except:
                         self.logger.exception("Failed to get current song from radio stream")
@@ -219,6 +221,29 @@ class Enigma2Client():
         except:
             self.logger.exception("Failed to get EPG")
 
+    def get_audiotracks(self):
+        self.enigma_state.audiotracks = []
+        response = requests.get("http://%s/web/getaudiotracks" %(self.enigma_config["hostname"]))
+        tree = ElementTree.fromstring(response.content)
+        for audiotrack_tag in tree:
+            if audiotrack_tag.tag == "e2audiotrack":
+                audiotrack = {}
+                for audiotrack_attr in audiotrack_tag:
+                    if audiotrack_attr.tag == "e2audiotrackdescription":
+                        audiotrack["description"] = audiotrack_attr.text
+                    if audiotrack_attr.tag == "e2audiotrackid":
+                        audiotrack["id"] = audiotrack_attr.text
+                    if audiotrack_attr.tag == "e2audiotrackpid":
+                        audiotrack["pid"] = audiotrack_attr.text
+                    if audiotrack_attr.tag == "e2audiotrackactive":
+                        audiotrack["active"] = audiotrack_attr.text
+                self.enigma_state.audiotracks.append(audiotrack)
+        return self.enigma_state.audiotracks
+
+    def set_audiotrack(self, audiotrack):
+        response = requests.get("http://%s/web/selectaudiotrack?id=%s" %(self.enigma_config["hostname"], audiotrack["id"]))
+        self.get_audiotracks()
+
     def get_empty_service_event(self, service):
         return {
             "id": 0,
@@ -235,6 +260,7 @@ class Enigma2Client():
 
     def get_empty_service_event_stream(self, service):
         service_event = self.get_empty_service_event(service)
+        service_event["id"] = int(hashlib.sha1(service["reference"].encode('utf-8')).hexdigest(), 16) % (10 ** 8)
         service_event["start"] = int(time.time()) - 10
         service_event["duration"] = 60000
         service_event["currenttime"] = int(time.time()) + 1
@@ -242,41 +268,68 @@ class Enigma2Client():
         return service_event
 
     def get_current_service_event(self, service):
+        self.enigma_state.current_service_event = self.get_service_event(service)
+        return self.enigma_state.current_service_event
+
+    def get_service_event(self, service):
         if "events" in service:
             for service_event in service["events"]:
                 if service_event["start"] < service_event["currenttime"] and service_event["start"] + service_event["duration"] > service_event["currenttime"]:
-                    self.enigma_state.current_service_event = service_event
                     return service_event
         return None
 
     def update(self):
         last_service = self.enigma_state.current_service
+        last_service_event = self.enigma_state.current_service_event
         self.enigma_state.current_service = self.get_current_service_stream()
         self.get_epg(self.enigma_state.current_service)
-        self.update_label(self.enigma_state.current_service)
+        self.enigma_state.current_service_event = self.get_service_event(self.enigma_state.current_service)
+        self.update_label(self.enigma_state.current_service, self.enigma_state.current_service_event)
+        service_has_changed = False
+        service_event_has_changed = False
         if not last_service or self.enigma_state.current_service["reference"] != last_service["reference"]:
-            self.insert_history(self.enigma_state.current_service)
+            service_has_changed = True
+            if last_service:
+                self.logger.info("Service has changed %s => %s"%(last_service["reference"], self.enigma_state.current_service["reference"]))
+            else:
+                self.logger.info("Service has changed NONE => %s"%(self.enigma_state.current_service["reference"]))
+        if not last_service_event or not self.enigma_state.current_service_event or self.enigma_state.current_service_event["id"] != last_service_event["id"]:
+            service_event_has_changed = True
+            if last_service_event and self.enigma_state.current_service_event:
+                self.logger.info("ServiceEvent has changed %s => %s" %(last_service_event["id"], self.enigma_state.current_service_event["id"]))
+            elif self.enigma_state.current_service_event:
+                self.logger.info("ServiceEvent has changed NONE => %s" %(str(self.enigma_state.current_service_event["id"])))
+            elif last_service_event:
+                self.logger.info("ServiceEvent has changed %s => NONE" %(last_service_event["id"]))
+            else:
+                self.logger.info("ServiceEvent has changed.")
+        history_has_changed = False
+        if service_has_changed or service_event_has_changed:
+            self.insert_history(self.enigma_state.current_service, self.enigma_state.current_service_event)
+            history_has_changed = True
+        if history_has_changed and self.enigma_config["showHistory"]:
+            self.enigma_indicator.rebuild_menu()
 
-    def insert_history(self, service):
+    def insert_history(self, service, service_event = None):
         history = []
-        for _service in self.enigma_state.history:
-            if _service["reference"] != service["reference"]:
-                history.append(_service)
-        history.insert(0, service)
+        for (_service, _service_event) in self.enigma_state.history:
+            if not _service or not _service_event or (_service and service and _service_event and service_event and _service["reference"] != service["reference"] and _service_event["id"] != service_event["id"]):
+                history.append((_service, _service_event))
+            if len(history) >= self.enigma_config["maxHistoryEntries"] - 1:
+                break
+        history.insert(0, (service, service_event))
         self.enigma_state.history = history
-        self.enigma_indicator.rebuild_menu()
 
-    def update_label(self, service):
+    def update_label(self, service, service_event):
         if service:
             if self.enigma_config["showCurrentShowTitle"]:
-                current_service_event = self.get_current_service_event(service)
-                if current_service_event != None:
+                if service_event != None:
                     if self.enigma_config["showStationName"]:
-                        self.enigma_indicator.update_label("%s: %s" %(service["name"], current_service_event["title"]))
-                    elif current_service_event["title"].strip() == "" and self.enigma_config["currentShowTitleFallback"]:
+                        self.enigma_indicator.update_label("%s: %s" %(service["name"], service_event["title"]))
+                    elif service_event["title"].strip() == "" and self.enigma_config["currentShowTitleFallback"]:
                         self.enigma_indicator.update_label(service["name"])
                     else:
-                        self.enigma_indicator.update_label(current_service_event["title"])
+                        self.enigma_indicator.update_label(service_event["title"])
                 elif self.enigma_config["showStationName"]:
                     self.enigma_indicator.update_label(service["name"])
             elif self.enigma_config["showStationName"]:
@@ -313,8 +366,6 @@ class Enigma2Client():
         if service:
             if "FROM BOUQUET" in service["reference"]:
                 services = self.fetch_services(service)
-                self.logger.info(str(services))
-                self.logger.info(str(self.get_stream_url(services[0], quoted)))
                 return self.get_stream_url(services[0], quoted)
             elif service["reference"].split(":")[0] == "4097":
                 service["type"] = "stream"
@@ -341,32 +392,27 @@ class Enigma2Client():
         try:
             self.logger.info("Select channel %s" %(service["reference"]))
             response = requests.get("http://%s/web/zap?sRef=%s" %(self.enigma_config["hostname"], quote(service["reference"])))
-            self.current_service = service
-            self.update_label(service)
         except:
-            self.logger.error("Failed to select channel")
+            self.logger.exception("Failed to select channel")
 
     def channel_up(self):
         try:
             self.logger.info("Channel up")
             response = requests.get("http://%s/web/remotecontrol?command=403" %(self.enigma_config["hostname"]))
-            self.update()
         except:
-            self.logger.error("Failed to select next channel")
+            self.logger.exception("Failed to select next channel")
 
     def channel_down(self):
         try:
             self.logger.info("Channel down")
             response = requests.get("http://%s/web/remotecontrol?command=402" %(self.enigma_config["hostname"]))
-            self.update()
         except:
-            self.logger.error("Failed to select previous channel")
+            self.logger.exception("Failed to select previous channel")
 
     def set_power_state(self, state):
         try:
             self.logger.info("Setting power state %d" %(state))
             response = requests.get("http://%s/web/powerstate?newstate=%d" %(self.enigma_config["hostname"], state))
-            self.update()
         except:
             self.logger.error("Failed to set power state")
 

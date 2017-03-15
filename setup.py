@@ -19,5 +19,8 @@ setup(name = "e2indicator",
           ("/usr/share/applications", ["dist/share/applications/e2indicator.desktop"]),
           ("/usr/share/pixmaps", ["dist/share/pixmaps/e2indicator.png"]),
       ],
-      entry_points = {"console_scripts": ["e2indicator = e2indicator.__main__:main"]}
+      entry_points = {"console_scripts": ["e2indicator = e2indicator.__main__:main"]},
+      install_requires = [
+          'appdirs', 'toml'
+      ]
 )

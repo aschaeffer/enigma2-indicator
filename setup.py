@@ -15,6 +15,7 @@ setup(name = "e2indicator",
       url = "https://github.com/aschaeffer/enigma2-indicator",
       download_url = "https://github.com/aschaeffer/enigma2-indicator/archive/0.9.0.tar.gz",
       author = "Andreas Schaeffer",
+      author_email = "e2indicator@schaeffernet.de",
       license = "GPLv3",
       data_files = [
           ("/usr/share/applications", ["dist/share/applications/e2indicator.desktop"]),

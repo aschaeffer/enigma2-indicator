@@ -13,6 +13,7 @@ setup(name = "e2indicator",
           "Programming Language :: Python :: 3",
       ],
       url = "https://github.com/aschaeffer/enigma2-indicator",
+      download_url = "https://github.com/aschaeffer/enigma2-indicator/archive/0.9.0.tar.gz",
       author = "Andreas Schaeffer",
       license = "GPLv3",
       data_files = [

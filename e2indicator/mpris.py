@@ -247,5 +247,8 @@ class Enigma2MprisServer(threading.Thread, dbus.service.Object):
 
     def run(self):
         while not self.ended:
-            time.sleep(1.0)
-            self.update()
+            try:
+                time.sleep(1.0)
+                self.update()
+            except:
+                self.logger.exception("Failed to update dbus metadata")

@@ -23,6 +23,11 @@ Indicator for Enigma 2 based set top boxes in the local network.
     git clone https://github.com/aschaeffer/enigma2-indicator.git
     cd enigma2-indicator
     sudo -H pip install . --no-cache-dir --upgrade
+
+### Optional
+
+Add `e2-indicator.desktop` to the list of `interested-media-players`:
+
     gsettings set com.canonical.indicator.sound interested-media-players "['e2indicator.desktop']"
 
 ## Usage

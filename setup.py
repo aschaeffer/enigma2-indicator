@@ -13,11 +13,16 @@ setup(name = "e2indicator",
           "Programming Language :: Python :: 3",
       ],
       url = "https://github.com/aschaeffer/enigma2-indicator",
+      download_url = "https://github.com/aschaeffer/enigma2-indicator/archive/0.9.0.tar.gz",
       author = "Andreas Schaeffer",
+      author_email = "e2indicator@schaeffernet.de",
       license = "GPLv3",
       data_files = [
           ("/usr/share/applications", ["dist/share/applications/e2indicator.desktop"]),
           ("/usr/share/pixmaps", ["dist/share/pixmaps/e2indicator.png"]),
       ],
-      entry_points = {"console_scripts": ["e2indicator = e2indicator.__main__:main"]}
+      entry_points = {"console_scripts": ["e2indicator = e2indicator.__main__:main"]},
+      install_requires = [
+          'appdirs', 'toml'
+      ]
 )
